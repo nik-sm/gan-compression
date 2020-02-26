@@ -3,13 +3,13 @@ import torch
 import math
 
 
-class Residual(nn.Module):
-    def __init__(self, weight, layer):
-        super(Residual, self).__init__()
-        self.weight = weight
-        self.l = layer
-    def forward(self, inp):
-        return self.weight * inp + (1 - self.weight) * self.l(inp)
+#class Residual(nn.Module):
+#    def __init__(self, weight, layer):
+#        super().__init__()
+#        self.weight = weight
+#        self.l = layer
+#    def forward(self, inp):
+#        return self.weight * inp + (1 - self.weight) * self.l(inp)
 
 def downsampling_layer(k, l):
     c1 = nn.Sequential(
@@ -46,10 +46,8 @@ def upsampling_layer(k, with_skip=True):
 
 # Generates 64x64 images
 class Generator(nn.Module):
-    def __init__(self, latent_dim, num_filters, ngpu):
-        super(Generator, self).__init__()
-        self.ngpu = ngpu
-
+    def __init__(self, latent_dim, num_filters):
+        super().__init__()
         self.latent_dim = latent_dim
         self.num_filters = num_filters
         self.initial_size = 8
@@ -85,10 +83,8 @@ class Generator(nn.Module):
         return self.output_activ(self.output_fmap(ups3))
 
 class Discriminator(nn.Module):
-    def __init__(self, latent_dim, num_filters, ngpu):
-        super(Discriminator, self).__init__()
-        self.ngpu = ngpu
-
+    def __init__(self, latent_dim, num_filters):
+        super().__init__()
         self.latent_dim = latent_dim
         self.num_filters = num_filters
 
@@ -110,7 +106,7 @@ class Discriminator(nn.Module):
         self.output = nn.Linear(num_filters * 8 * 8, latent_dim, bias=False)
 
         # used for autoencoder loss
-        self.decoder = Generator(latent_dim, num_filters, ngpu)
+        self.decoder = Generator(latent_dim, num_filters)
 
     def forward(self, input):
         k = self.num_filters
@@ -122,10 +118,8 @@ class Discriminator(nn.Module):
         return self.decoder.forward(latent)
 
 class SizedGenerator(nn.Module):
-    def __init__(self, latent_dim, num_filters, image_size, num_ups, ngpu):
-        super(SizedGenerator, self).__init__()
-        self.ngpu = ngpu
-
+    def __init__(self, latent_dim, num_filters, image_size, num_ups):
+        super().__init__()
         self.latent_dim = latent_dim
         self.num_filters = num_filters
         self.output_size = image_size
@@ -165,10 +159,8 @@ class SizedGenerator(nn.Module):
         return self.output_activ(self.output_fmap(chain) )
 
 class SizedDiscriminator(nn.Module):
-    def __init__(self, latent_dim, num_filters, image_size, num_dns, ngpu):
-        super(SizedDiscriminator, self).__init__()
-        self.ngpu = ngpu
-
+    def __init__(self, latent_dim, num_filters, image_size, num_dns):
+        super().__init__()
         self.latent_dim = latent_dim
         self.num_filters = num_filters
         self.output_size = image_size
@@ -185,7 +177,7 @@ class SizedDiscriminator(nn.Module):
         self.conv = nn.ModuleList(conv)
 
         self.output = nn.Linear((num_dns+1) * num_filters * (self.initial_size**2), latent_dim, bias=False)
-        self.decoder = SizedGenerator(latent_dim, num_filters, image_size, num_dns, ngpu)
+        self.decoder = SizedGenerator(latent_dim, num_filters, image_size, num_dns)
 
     def forward(self, inp):
 

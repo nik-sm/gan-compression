@@ -45,80 +45,85 @@ def upsampling_layer(k, with_skip=True):
             c2)
 
 # Generates 64x64 images
-class Generator(nn.Module):
-    def __init__(self, latent_dim, num_filters):
-        super().__init__()
-        self.latent_dim = latent_dim
-        self.num_filters = num_filters
-        self.initial_size = 8
+#class Generator(nn.Module):
+#    def __init__(self, latent_dim, num_filters, output_activ='elu'):
+#        super().__init__()
+#        self.latent_dim = latent_dim
+#        self.num_filters = num_filters
+#        self.initial_size = 8
+#
+#        self.initial_fmaps = nn.Linear(latent_dim,
+#                                       self.initial_size**2 * num_filters,
+#                                       bias=False)
+#
+#
+#        # input is [k x 8 x 8]
+#        self.ups1 = upsampling_layer(num_filters, with_skip=False)
+#        self.skip1 = nn.Upsample(scale_factor=2, mode="nearest")
+#
+#
+#        # input is [k x 16 x 16]
+#        self.ups2 = upsampling_layer(num_filters, with_skip=True)
+#        self.skip2 = nn.Upsample(scale_factor=4, mode="nearest")
+#
+#        # input is [k x 32 x 32]
+#        self.ups3 = upsampling_layer(num_filters, with_skip=True)
+#
+#        # input is [k x 64 x 64]
+#        self.output_fmap = nn.Conv2d(num_filters, 3, kernel_size=(3, 3), padding=1, bias=False)
+#        if output_activ == 'elu':
+#            self.output_activ = nn.ELU()
+#        elif output_activ == 'sigmoid':
+#            self.output_activ = nn.Sigmoid()
+#        else:
+#            raise NotImplementedError()
+#
+#    def forward(self, input):
+#        k = self.num_filters
+#        s = self.initial_size
+#        fmaps = self.initial_fmaps(input).view(-1, k, s, s)
+#        ups1 = self.ups1(fmaps)
+#        ups2 = self.ups2(torch.cat((ups1, self.skip1(fmaps)), dim=1))
+#        ups3 = self.ups3(torch.cat((ups2, self.skip2(fmaps)), dim=1))
+#        return self.output_activ(self.output_fmap(ups3))
 
-        self.initial_fmaps = nn.Linear(latent_dim,
-                                       self.initial_size**2 * num_filters,
-                                       bias=False)
-
-
-        # input is [k x 8 x 8]
-        self.ups1 = upsampling_layer(num_filters, with_skip=False)
-        self.skip1 = nn.Upsample(scale_factor=2, mode="nearest")
-
-
-        # input is [k x 16 x 16]
-        self.ups2 = upsampling_layer(num_filters, with_skip=True)
-        self.skip2 = nn.Upsample(scale_factor=4, mode="nearest")
-
-        # input is [k x 32 x 32]
-        self.ups3 = upsampling_layer(num_filters, with_skip=True)
-
-        # input is [k x 64 x 64]
-        self.output_fmap = nn.Conv2d(num_filters, 3, kernel_size=(3, 3), padding=1, bias=False)
-        self.output_activ = nn.ELU()
-
-    def forward(self, input):
-        k = self.num_filters
-        s = self.initial_size
-        fmaps = self.initial_fmaps(input).view(-1, k, s, s)
-        ups1 = self.ups1(fmaps)
-        ups2 = self.ups2(torch.cat((ups1, self.skip1(fmaps)), dim=1))
-        ups3 = self.ups3(torch.cat((ups2, self.skip2(fmaps)), dim=1))
-        return self.output_activ(self.output_fmap(ups3))
-
-class Discriminator(nn.Module):
-    def __init__(self, latent_dim, num_filters):
-        super().__init__()
-        self.latent_dim = latent_dim
-        self.num_filters = num_filters
-
-
-        self.initial_fmaps = nn.Conv2d(3, num_filters, kernel_size=(3, 3), padding=1)
-        self.initial_activ = nn.ELU()
-
-
-        # input is [k x 64 x 64]
-        self.dns1 = downsampling_layer(num_filters, l=1)
-
-        # input is [k x 32 x 32]
-        self.dns2 = downsampling_layer(num_filters, l=2)
-
-        # input is [k x 16 x 16]
-        self.dns3 = downsampling_layer(num_filters, l=3)
-
-        # input is [k x 8 x 8]
-        self.output = nn.Linear(num_filters * 8 * 8, latent_dim, bias=False)
-
-        # used for autoencoder loss
-        self.decoder = Generator(latent_dim, num_filters)
-
-    def forward(self, input):
-        k = self.num_filters
-        fmaps = self.initial_activ(self.initial_fmaps(input))
-        dns1 = self.dns1(fmaps)
-        dns2 = self.dns2(dns1)
-        dns3 = self.dns3(dns2)
-        latent = self.output(dns3.view((-1, k * 8 * 8)))
-        return self.decoder.forward(latent)
+#class Discriminator(nn.Module):
+#    def __init__(self, latent_dim, num_filters):
+#        super().__init__()
+#        self.latent_dim = latent_dim
+#        self.num_filters = num_filters
+#
+#
+#        self.initial_fmaps = nn.Conv2d(3, num_filters, kernel_size=(3, 3), padding=1)
+#        self.initial_activ = nn.ELU()
+#
+#
+#        # input is [k x 64 x 64]
+#        self.dns1 = downsampling_layer(num_filters, l=1)
+#
+#        # input is [k x 32 x 32]
+#        self.dns2 = downsampling_layer(num_filters, l=2)
+#
+#        # input is [k x 16 x 16]
+#        self.dns3 = downsampling_layer(num_filters, l=3)
+#
+#        # input is [k x 8 x 8]
+#        self.output = nn.Linear(num_filters * 8 * 8, latent_dim, bias=False)
+#
+#        # used for autoencoder loss
+#        self.decoder = Generator(latent_dim, num_filters)
+#
+#    def forward(self, input):
+#        k = self.num_filters
+#        fmaps = self.initial_activ(self.initial_fmaps(input))
+#        dns1 = self.dns1(fmaps)
+#        dns2 = self.dns2(dns1)
+#        dns3 = self.dns3(dns2)
+#        latent = self.output(dns3.view((-1, k * 8 * 8)))
+#        return self.decoder.forward(latent)
 
 class SizedGenerator(nn.Module):
-    def __init__(self, latent_dim, num_filters, image_size, num_ups):
+    def __init__(self, latent_dim, num_filters, image_size, num_ups, output_activ='elu'):
         super().__init__()
         self.latent_dim = latent_dim
         self.num_filters = num_filters
@@ -145,7 +150,12 @@ class SizedGenerator(nn.Module):
         self.skip = nn.ModuleList(skip)
 
         self.output_fmap = nn.Conv2d(num_filters, 3, kernel_size=(3, 3), padding=1, bias=False)
-        self.output_activ = nn.ELU()
+        if output_activ == 'elu':
+            self.output_activ = nn.ELU()
+        elif output_activ == 'sigmoid':
+            self.output_activ = nn.Sigmoid()
+        else:
+            raise NotImplementedError()
 
     def forward(self, inp):
 
@@ -159,13 +169,13 @@ class SizedGenerator(nn.Module):
         return self.output_activ(self.output_fmap(chain) )
 
 class SizedDiscriminator(nn.Module):
-    def __init__(self, latent_dim, num_filters, image_size, num_dns):
+    def __init__(self, latent_dim, num_filters, image_size, num_dns, output_activ='elu'):
         super().__init__()
         self.latent_dim = latent_dim
         self.num_filters = num_filters
         self.output_size = image_size
         self.initial_size = int(image_size / (2**num_dns))
-        print(self.initial_size)
+        #print(self.initial_size)
         self.num_dns = num_dns
 
         self.initial_fmaps = nn.Conv2d(3, self.num_filters, kernel_size=(3, 3), padding=1)
@@ -177,7 +187,7 @@ class SizedDiscriminator(nn.Module):
         self.conv = nn.ModuleList(conv)
 
         self.output = nn.Linear((num_dns+1) * num_filters * (self.initial_size**2), latent_dim, bias=False)
-        self.decoder = SizedGenerator(latent_dim, num_filters, image_size, num_dns)
+        self.decoder = SizedGenerator(latent_dim, num_filters, image_size, num_dns, output_activ)
 
     def forward(self, inp):
 

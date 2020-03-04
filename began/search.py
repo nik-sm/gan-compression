@@ -16,8 +16,8 @@ import params as P
 from utils import save_img_tensorboard
 
 def load_trained_generator():
-    #latest_gen = "began_gen_ckpt_29.pt"
-    latest_gen = "ffhq_subset_10/gen_ckpt.29.pt"
+    latest_gen = "began_gen_ckpt_29.pt"
+    #latest_gen = "ffhq_subset_10/gen_ckpt.29.pt"
     gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups)
     try:
         gen.load_state_dict(torch.load(os.path.join("checkpoints", latest_gen))['model_state_dict'])
@@ -58,10 +58,11 @@ save_img_tensorboard(x.squeeze(0).detach().cpu(), writer, f'original')
 
 g = load_trained_generator()
 
-n_steps = 10000
-save_every_n = 500
+n_steps = 5000
+save_every_n = 50
+n_restarts = 3
 
-for i in trange(3):
+for i in trange(n_restarts):
     seed = i
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -78,6 +79,9 @@ for i in trange(3):
     gamma = 2 ** (math.log(0.25, 2) / n_steps) # Want to hit 0.25*initial_lr after n_steps steps (arbitrary design)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma)
 
+    with torch.no_grad():
+        save_img_tensorboard(g(z_initial).squeeze(0).detach().cpu(), writer, f'restart_{i}/beginning')
+
     for j in trange(n_steps, leave=False):
         optimizer.zero_grad()
         #x_hat = (g(z).squeeze(0) + 1) / 2
@@ -90,5 +94,5 @@ for i in trange(3):
         writer.add_scalar(f'MSE/{i}', mse, j)
         writer.add_scalar(f'PSNR/{i}', psnr(x, x_hat), j)
 
-        if j % save_every_n == 0:
-            save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'reconstr_initialization_{i}', j)
+        if j % save_every_n == 0 or j == n_steps - 1:
+            save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/reconstruction', j)

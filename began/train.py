@@ -8,7 +8,7 @@ import numpy as np
 import os
 
 import params as P
-import dataloaders as DL
+from dataloaders import get_dataloader, AVAIL_DATALOADERS
 
 def save(path, epoch, model, optimizer, scheduler):
     torch.save({
@@ -30,16 +30,23 @@ def load(path, model, optimizer, scheduler):
 def ac_loss(input, disc):
     return torch.mean(torch.abs(input - disc.forward(input)))  # pixelwise L1 - for each pixel for each image in the batch
 
-def main(dataset):
+def main(dataset, run_name, n_train, output_activ, epochs):
+    checkpoint_path = f"checkpoints/{dataset}_{run_name}"
+    tensorboard_path = f"tensorboard_logs/{dataset}_{run_name}"
     torch.backends.cudnn.benchmark = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    writer = SummaryWriter(f'tensorboard_logs/{dataset}')
+    writer = SummaryWriter(tensorboard_path)
 
-    dataloader = getattr(DL, dataset)()
-    print(f"dataloader: {dataloader}")
+    if dataset == 'ffhq':
+        dataset_path = './data/ffhq-preprocessed'
+    elif dataset == 'celeba':
+        dataset_path = './data/celeba-preprocessed'
 
-    gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups).to(device)
-    disc = SizedDiscriminator(P.latent_dim, P.num_filters, P.size, P.num_ups).to(device)
+    dataloader = get_dataloader(dataset_path, n_train, True)
+    # TODO - useful print? print(f"FolderDataset: {dataloader.dataset}")
+
+    gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+    disc = SizedDiscriminator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
 
     #if torch.cuda.device_count() > 1:
     #    gen = torch.nn.DataParallel(gen)
@@ -50,20 +57,20 @@ def main(dataset):
     disc_optimizer = torch.optim.Adam(disc.parameters(), P.lr)
     disc_scheduler = torch.optim.lr_scheduler.StepLR(disc_optimizer, gamma=0.95, step_size=P.lr_update_step)
     current_checkpoint = 0
-    if (not os.path.exists(f"checkpoints/{dataset}")):
-        os.mkdir(f"checkpoints/{dataset}")
+    if (not os.path.exists(checkpoint_path)):
+        os.mkdir(checkpoint_path)
     else:
         print("Restoring from checkpoint...")
-        paths = os.listdir(f"checkpoints/{dataset}")
+        paths = os.listdir(checkpoint_path)
         try:
             available = sorted(set([int(x.split(".")[1]) for x in paths]))
 
             # Find a checkpoint that both gen AND disc have reached
             # Reaching zero will cause IndexError during pop()
-            while true:
+            while True:
                 latest_idx = available.pop()
-                latest_disc = f"disc_ckpt.{latest_idx}.pt"
-                latest_gen = f"gen_ckpt.{latest_idx}.pt"
+                latest_disc = os.path.join(checkpoint_path, f"disc_ckpt.{latest_idx}.pt")
+                latest_gen = os.path.join(checkpoint_path, f"gen_ckpt.{latest_idx}.pt")
                 if os.path.exists(latest_disc) and os.path.exists(latest_gen):
                     break
 
@@ -72,7 +79,8 @@ def main(dataset):
             gen_epoch = load(latest_gen, gen, gen_optimizer, gen_scheduler)
             assert disc_epoch == gen_epoch, 'Checkpoint contents are mismatched!'
             print(f"Loaded checkpoint {current_checkpoint}")
-        except:
+        except Exception as e:
+            print(e)
             print("Unable to load from checkpoint.")
 
     k = 0
@@ -84,7 +92,7 @@ def main(dataset):
     n_disc_param = sum([x.numel() for x in disc.parameters() if x.requires_grad])
     print(f"{n_gen_param + n_disc_param} Trainable Parameters")
 
-    for e in trange(current_checkpoint, P.train_epochs, initial=current_checkpoint, leave=True):
+    for e in trange(current_checkpoint, epochs, initial=current_checkpoint, leave=True):
         for i, img_batch in tqdm(enumerate(dataloader), total=len(dataloader), leave=False):
             disc_optimizer.zero_grad()
             gen_optimizer.zero_grad()
@@ -132,12 +140,16 @@ def main(dataset):
                 writer.add_image("Generator Output - Constant", ex_img_const, len(dataloader) * e + i)
                 writer.add_image("Generator Output - Random", ex_img, len(dataloader) * e + i)
 
-        save(f"checkpoints/{dataset}/gen_ckpt.{e}.pt", e, gen, gen_optimizer, gen_scheduler)
-        save(f"checkpoints/{dataset}/disc_ckpt.{e}.pt", e, disc, disc_optimizer, disc_scheduler)
+        save(os.path.join(checkpoint_path, f"gen_ckpt.{e}.pt"), e, gen, gen_optimizer, gen_scheduler)
+        save(os.path.join(checkpoint_path, f"disc_ckpt.{e}.pt"), e, disc, disc_optimizer, disc_scheduler)
 
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('--dataset', choices=DL.AVAIL_DATALOADERS, required=True)
+    p.add_argument('--dataset', choices=AVAIL_DATALOADERS, required=True)
+    p.add_argument('--epochs', type=int, default=30)
+    p.add_argument('--run_name', required=True)
+    p.add_argument('--n_train', type=int, default=-1)
+    p.add_argument('--output_activ', choices=['elu','sigmoid'], default='elu')
     args = p.parse_args()
-    main(args.dataset)
+    main(args.dataset, args.run_name, args.n_train, args.output_activ, args.epochs)

@@ -1,27 +1,26 @@
+import os
+import numpy as np
 import pathlib
 import params as P
 import torch.utils.data 
 
 AVAIL_DATALOADERS = ['celeba','ffhq']
 
-def celeba(train=True):
+def get_dataloader(base_path, n_train=-1, train=True):
     if train:
-        path = './data/celeba-preprocessed/train'
+        path = os.path.join(base_path, 'train')
     else:
-        path = './data/celeba-preprocessed/test'
-    return torch.utils.data.DataLoader(
-            FolderDataset(path),
-            batch_size=P.batch_size,
-            shuffle=False,
-            num_workers=2)
+        path = os.path.join(base_path, 'test')
 
-def ffhq(train=True):
-    if train:
-        path = './data/ffhq-preprocessed/train'
-    else:
-        path = './data/ffhq-preprocessed/test'
-    return torch.utils.data.DataLoader(
+    if n_train > 0:
+        dataset = torch.utils.data.Subset(
             FolderDataset(path),
+            np.arange(n_train))
+    else:
+        dataset = FolderDataset(path)
+
+    return torch.utils.data.DataLoader(
+            dataset,
             batch_size=P.batch_size,
             shuffle=False,
             num_workers=2)
@@ -33,6 +32,7 @@ class FolderDataset(torch.utils.data.Dataset):
     - Assumes images are pre-processed into tensors and saved as '*.pt' for optimal loading speed.
     """
     def __init__(self, folder):
+        self.folder = folder
         self.images = sorted(pathlib.Path(folder).rglob('*.pt'))
 
     def __len__(self):
@@ -40,3 +40,8 @@ class FolderDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         return torch.load(self.images[i])
+
+    def __repr__(self):
+        return self.__class__ + ":\n" + \
+               f"Images folder: {self.folder}" + \
+               f"Number of images: {self.__len__}"

@@ -2,7 +2,7 @@ batch_size = 16    # --> Size of training batch
 size = 128  # --> Size of images for training
 num_ups = 4 # --> Number of upsampling layers
 # test_folder = "data"  # --> Location of image folder
-train_epochs = 40  # --> Number of training epochs
+# train_epochs = 40  # --> Number of training epochs
 log_every = 100  # --> Number of iterations after which to log
 
 latent_dim = 64  # --> Dimensionality of latent codes

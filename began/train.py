@@ -40,7 +40,7 @@ def main(dataset, run_name, n_train, output_activ, epochs):
     if dataset == 'ffhq':
         dataset_path = './data/ffhq-preprocessed'
     elif dataset == 'celeba':
-        dataset_path = './data/celeba-preprocessed'
+        dataset_path = './data/celeba-preprocessed-v2'
 
     dataloader = get_dataloader(dataset_path, n_train, True)
     # TODO - useful print? print(f"FolderDataset: {dataloader.dataset}")
@@ -48,9 +48,9 @@ def main(dataset, run_name, n_train, output_activ, epochs):
     gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
     disc = SizedDiscriminator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
 
-    #if torch.cuda.device_count() > 1:
-    #    gen = torch.nn.DataParallel(gen)
-    #    disc = torch.nn.DataParallel(disc)
+    if torch.cuda.device_count() > 1:
+        gen = torch.nn.DataParallel(gen)
+        disc = torch.nn.DataParallel(disc)
 
     gen_optimizer = torch.optim.Adam(gen.parameters(), P.lr)
     gen_scheduler = torch.optim.lr_scheduler.StepLR(gen_optimizer, gamma=0.95, step_size=P.lr_update_step)
@@ -136,9 +136,17 @@ def main(dataset, run_name, n_train, output_activ, epochs):
 
             if (i % P.log_every == 0):
                 ex_img = gen.forward(g_latent_sample)[0]
+                writer.add_image("Generator Output - Random - Raw", ex_img, len(dataloader) * e + i)
+                writer.add_image("Generator Output - Random - Clamp", torch.clamp(ex_img, 0, 1), len(dataloader) * e + i)
+                ex_img -= ex_img.min()
+                ex_img /= ex_img.max()
+                writer.add_image("Generator Output - Random - Normalize", ex_img, len(dataloader) * e + i)
                 ex_img_const = gen.forward(const_sample)[0]
-                writer.add_image("Generator Output - Constant", ex_img_const, len(dataloader) * e + i)
-                writer.add_image("Generator Output - Random", ex_img, len(dataloader) * e + i)
+                writer.add_image("Generator Output - Constant - Raw", ex_img_const, len(dataloader) * e + i)
+                writer.add_image("Generator Output - Constant - Clamp", torch.clamp(ex_img_const, 0, 1), len(dataloader) * e + i)
+                ex_img_const -= ex_img_const.min()
+                ex_img_const /= ex_img_const.max()
+                writer.add_image("Generator Output - Constant - Normalize", ex_img_const, len(dataloader) * e + i)
 
         save(os.path.join(checkpoint_path, f"gen_ckpt.{e}.pt"), e, gen, gen_optimizer, gen_scheduler)
         save(os.path.join(checkpoint_path, f"disc_ckpt.{e}.pt"), e, disc, disc_optimizer, disc_scheduler)

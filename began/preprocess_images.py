@@ -43,7 +43,7 @@ def process(input_folder, output_folder, transform, glob='*.png', test_fraction=
         destination = join(output_folder, 'train', img_name + '.pt')
         #print(f"Would save: {img.shape} to {destination}")
         torch.save(img, destination)
- 
+
     # Save test subset
     os.makedirs(join(output_folder, 'test'), exist_ok=True)
     for img_full_path in tqdm(test_files, leave=True, desc='test_subset'):
@@ -62,17 +62,22 @@ if __name__ == '__main__':
     p.add_argument('--dataset', choices=['ffhq','celeba'], required=True)
     a = p.parse_args()
 
-    transform = transforms.Compose([
-        transforms.Resize((P.size, P.size)),
-        transforms.ToTensor()
-        ])
-
     if a.dataset == 'ffhq':
+        raise NotImplementedError("TODO - center crop!")
+        transform = transforms.Compose([
+            transforms.Resize((P.size, P.size)),
+            transforms.ToTensor()
+            ])
         input_folder = '/data/niklas/ffhq-dataset/images1024x1024/'
         output_folder = './data/ffhq-preprocessed'
         glob = '*.png'
+
     elif a.dataset == 'celeba':
+        # See README for notes on choosing crop location
+        transform = transforms.Compose([
+            transforms.Lambda(lambda img: transforms.functional.crop(img,51,26,128,128)),
+            transforms.ToTensor()])
         input_folder = '/data/niklas/datasets/celeba/'
-        output_folder = './data/celeba-preprocessed'
+        output_folder = './data/celeba-preprocessed-v2'
         glob = '*.jpg'
     process(input_folder, output_folder, transform, glob)

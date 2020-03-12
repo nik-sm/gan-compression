@@ -19,9 +19,16 @@ from utils import save_img_tensorboard
 def load_trained_generator(generator_checkpoint):
     #gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups)
     gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups) #n_layers_skipped=0)
-    gen = torch.nn.DataParallel(gen)
+#    gen = torch.nn.DataParallel(gen)
     try:
-        gen.load_state_dict(torch.load(generator_checkpoint)['model_state_dict'])
+        ckpt = torch.load(generator_checkpoint)['model_state_dict']
+        fixed_ckpt = {}
+        for k, v in ckpt.items():
+            if k.startswith('module.'):
+                fixed_ckpt[k[7:]] = v
+            else:
+                fixed_ckpt[k] = v
+        gen.load_state_dict(fixed_ckpt)
     except Exception as e:
         print(e)
         gen.load_state_dict(torch.load(generator_checkpoint))
@@ -83,7 +90,7 @@ def main(args):
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma)
 
         with torch.no_grad():
-            breakpoint()
+            #breakpoint()
             save_img_tensorboard(g(z_initial).squeeze(0).detach().cpu(), writer, f'restart_{i}/beginning')
 
         for j in trange(args.n_steps, leave=False):
@@ -98,8 +105,10 @@ def main(args):
             writer.add_scalar(f'MSE/{i}', mse, j)
             writer.add_scalar(f'PSNR/{i}', psnr(x, x_hat), j)
 
-            if j % save_every_n == 0 or j == n_steps - 1:
+            if j % save_every_n == 0:
                 save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/reconstruction', j)
+
+        save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/final')
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()

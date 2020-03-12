@@ -6,7 +6,6 @@ num_ups = 4 # --> Number of upsampling layers
 log_every = 100  # --> Number of iterations after which to log
 
 latent_dim = 64  # --> Dimensionality of latent codes
-ngpu = 1  # --> Number of GPUs
 num_filters = 128  # --> Number of filters to use in each layer
 
 lr = 0.0001  # --> Learning rate for Adam optimizers

@@ -9,31 +9,36 @@ from torchvision import transforms
 import numpy as np
 import sys
 from PIL import Image
-from torch_model import SizedGenerator, SizedDiscriminator
+from torch_model import SizedGenerator, SizedDiscriminator, AdjustedSizedGenerator
 import os
 from tqdm import trange
 
 import params as P
 from utils import save_img_tensorboard
 
-def load_trained_generator(gen_checkpoint):
-    gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups)
+def load_trained_generator(generator_checkpoint):
+    #gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups)
+    gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups) #n_layers_skipped=0)
+    gen = torch.nn.DataParallel(gen)
     try:
-        gen.load_state_dict(torch.load(gen_checkpoint)['model_state_dict'])
-    except:
-        gen.load_state_dict(torch.load(gen_checkpoint))
+        gen.load_state_dict(torch.load(generator_checkpoint)['model_state_dict'])
+    except Exception as e:
+        print(e)
+        gen.load_state_dict(torch.load(generator_checkpoint))
 
     gen.eval()
     return gen.to('cuda:0')
 
 def load_target_image(filename):
-    image = Image.open(filename)
-    t = transforms.Compose([
-        #transforms.CenterCrop(P.size),
-        transforms.Resize(P.size),
-        transforms.ToTensor()])
-    x = t(image)
-#    x.unsqueeze_(0)
+    if filename.endswith('.pt'):
+        x = torch.load(filename)
+    else:
+        image = Image.open(filename)
+        t = transforms.Compose([
+            #transforms.CenterCrop(P.size), # NOTE - we should carefully crop target images
+            transforms.Resize(P.size),
+            transforms.ToTensor()])
+        x = t(image)
     return x.to('cuda:0')
 
 def psnr(img1, img2):
@@ -47,15 +52,16 @@ def output_to_imshow(v):
     return v.squeeze(0).detach().to('cpu').numpy().transpose(1,2,0)
 
 def main(args):
+
     logdir = f'tensorboard_logs/search/{args.run_name}'
-    os.makedirs(logdir)
+    os.makedirs(logdir, exist_ok=True) # TODO - decide whether to clobber or what?
 
     writer = SummaryWriter(logdir)
 
     x = load_target_image(args.image)
     save_img_tensorboard(x.squeeze(0).detach().cpu(), writer, f'original')
 
-    g = load_trained_generator(args.gen_checkpoint)
+    g = load_trained_generator(args.generator_checkpoint)
 
     save_every_n = 50
 
@@ -77,6 +83,7 @@ def main(args):
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma)
 
         with torch.no_grad():
+            breakpoint()
             save_img_tensorboard(g(z_initial).squeeze(0).detach().cpu(), writer, f'restart_{i}/beginning')
 
         for j in trange(args.n_steps, leave=False):

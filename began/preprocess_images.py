@@ -66,8 +66,8 @@ def dir_path(string):
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--dataset', choices=['ffhq','celeba'], required=True)
-    p.add_argument('--input_folder', required=True)
-    p.add_argument('--output_folder', required=True)
+    p.add_argument('--input_dir', required=True)
+    p.add_argument('--output_dir', required=True)
     a = p.parse_args()
 
     if a.dataset == 'ffhq':
@@ -88,4 +88,4 @@ if __name__ == '__main__':
         # input_folder = '/data/niklas/datasets/celeba/'
         # output_folder = './data/celeba-preprocessed-v2'
         glob = '*.jpg'
-    process(a.input_folder, a.output_folder, transform, glob)
+    process(a.input_dir, a.output_dir, transform, glob)

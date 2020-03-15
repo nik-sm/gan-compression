@@ -30,17 +30,17 @@ def load(path, model, optimizer, scheduler):
 def ac_loss(input, disc):
     return torch.mean(torch.abs(input - disc.forward(input)))  # pixelwise L1 - for each pixel for each image in the batch
 
-def main(dataset, run_name, n_train, output_activ, epochs):
+def main(dataset, dataset_path, run_name, n_train, output_activ, epochs):
     checkpoint_path = f"checkpoints/{dataset}_{run_name}"
     tensorboard_path = f"tensorboard_logs/{dataset}_{run_name}"
     torch.backends.cudnn.benchmark = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     writer = SummaryWriter(tensorboard_path)
 
-    if dataset == 'ffhq':
-        dataset_path = './data/ffhq-preprocessed'
-    elif dataset == 'celeba':
-        dataset_path = './data/celeba-preprocessed-v2'
+    # if dataset == 'ffhq':
+    #     dataset_path = './data/ffhq-preprocessed'
+    # elif dataset == 'celeba':
+    #     dataset_path = './data/celeba-preprocessed-v2'
 
     dataloader = get_dataloader(dataset_path, n_train, True)
     # TODO - useful print? print(f"FolderDataset: {dataloader.dataset}")
@@ -58,7 +58,7 @@ def main(dataset, run_name, n_train, output_activ, epochs):
     disc_scheduler = torch.optim.lr_scheduler.StepLR(disc_optimizer, gamma=0.95, step_size=P.lr_update_step)
     current_checkpoint = 0
     if (not os.path.exists(checkpoint_path)):
-        os.mkdir(checkpoint_path)
+        os.makedirs(checkpoint_path)
     else:
         print("Restoring from checkpoint...")
         paths = os.listdir(checkpoint_path)
@@ -155,9 +155,10 @@ def main(dataset, run_name, n_train, output_activ, epochs):
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--dataset', choices=AVAIL_DATALOADERS, required=True)
+    p.add_argument('--dataset_dir', required=True)
     p.add_argument('--epochs', type=int, default=30)
     p.add_argument('--run_name', required=True)
     p.add_argument('--n_train', type=int, default=-1)
     p.add_argument('--output_activ', choices=['elu','sigmoid'], default='elu')
     args = p.parse_args()
-    main(args.dataset, args.run_name, args.n_train, args.output_activ, args.epochs)
+    main(args.dataset, args.dataset_dir, args.run_name, args.n_train, args.output_activ, args.epochs)

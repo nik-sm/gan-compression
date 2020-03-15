@@ -4,3 +4,5 @@ venv/
 dataset/
 .vscode/
 __pycache__/
+tensorboard_logs/
+checkpoints/

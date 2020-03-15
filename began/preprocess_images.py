@@ -57,9 +57,17 @@ def process(input_folder, output_folder, transform, glob='*.png', test_fraction=
     open(finished_flag, 'a').close()
     return
 
+def dir_path(string):
+    if os.path.isdir(string):
+        return string
+    else:
+        raise NotADirectoryError(string)
+
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--dataset', choices=['ffhq','celeba'], required=True)
+    p.add_argument('--input_folder', required=True)
+    p.add_argument('--output_folder', required=True)
     a = p.parse_args()
 
     if a.dataset == 'ffhq':
@@ -68,8 +76,8 @@ if __name__ == '__main__':
             transforms.Resize((P.size, P.size)),
             transforms.ToTensor()
             ])
-        input_folder = '/data/niklas/ffhq-dataset/images1024x1024/'
-        output_folder = './data/ffhq-preprocessed'
+        # input_folder = '/data/niklas/ffhq-dataset/images1024x1024/'
+        # output_folder = './data/ffhq-preprocessed'
         glob = '*.png'
 
     elif a.dataset == 'celeba':
@@ -77,7 +85,7 @@ if __name__ == '__main__':
         transform = transforms.Compose([
             transforms.Lambda(lambda img: transforms.functional.crop(img,51,26,128,128)),
             transforms.ToTensor()])
-        input_folder = '/data/niklas/datasets/celeba/'
-        output_folder = './data/celeba-preprocessed-v2'
+        # input_folder = '/data/niklas/datasets/celeba/'
+        # output_folder = './data/celeba-preprocessed-v2'
         glob = '*.jpg'
-    process(input_folder, output_folder, transform, glob)
+    process(a.input_folder, a.output_folder, transform, glob)

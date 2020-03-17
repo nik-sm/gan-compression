@@ -1,4 +1,4 @@
-batch_size = 32    # --> Size of training batch
+batch_size = 64    # --> Size of training batch
 size = 128  # --> Size of images for training
 num_ups = 4 # --> Number of upsampling layers
 # test_folder = "data"  # --> Location of image folder

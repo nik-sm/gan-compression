@@ -9,7 +9,12 @@ import torch
 
 import params as P
 
-def process(input_folder, output_folder, transform, glob='*.png', test_fraction=0.05):
+
+def process(input_folder,
+            output_folder,
+            transform,
+            glob='*.png',
+            test_fraction=0.05):
     """
     This processing assumes the input images, when sorted by name, are randomized.
     - We produce a single folder of 'train' and 'test' data.
@@ -26,7 +31,7 @@ def process(input_folder, output_folder, transform, glob='*.png', test_fraction=
 
     n_total = len(all_image_files)
     # Keep at least 1 for testing from each folder
-    n_test = max(1, int(n_total * test_fraction)) 
+    n_test = max(1, int(n_total * test_fraction))
     n_train = n_total - n_test
     train_files = all_image_files[:n_train]
     test_files = all_image_files[n_train:]
@@ -57,27 +62,41 @@ def process(input_folder, output_folder, transform, glob='*.png', test_fraction=
     open(finished_flag, 'a').close()
     return
 
+
+def dir_path(string):
+    if os.path.isdir(string):
+        return string
+    else:
+        raise NotADirectoryError(string)
+
+
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('--dataset', choices=['ffhq','celeba'], required=True)
+    p.add_argument('--dataset', choices=['ffhq', 'celeba'], required=True)
+    p.add_argument('--input_dir', required=True)
+    p.add_argument('--output_dir', required=True)
     a = p.parse_args()
 
     if a.dataset == 'ffhq':
-        raise NotImplementedError("TODO - center crop!")
+        # raise NotImplementedError("TODO - center crop!")
         transform = transforms.Compose([
+            transforms.Lambda(
+                lambda img: transforms.functional.crop(img, 50, 50, 900, 900)),
             transforms.Resize((P.size, P.size)),
             transforms.ToTensor()
-            ])
-        input_folder = '/data/niklas/ffhq-dataset/images1024x1024/'
-        output_folder = './data/ffhq-preprocessed'
+        ])
+        # input_folder = '/data/niklas/ffhq-dataset/images1024x1024/'
+        # output_folder = './data/ffhq-preprocessed'
         glob = '*.png'
 
     elif a.dataset == 'celeba':
         # See README for notes on choosing crop location
         transform = transforms.Compose([
-            transforms.Lambda(lambda img: transforms.functional.crop(img,51,26,128,128)),
-            transforms.ToTensor()])
-        input_folder = '/data/niklas/datasets/celeba/'
-        output_folder = './data/celeba-preprocessed-v2'
+            transforms.Lambda(
+                lambda img: transforms.functional.crop(img, 51, 26, 128, 128)),
+            transforms.ToTensor()
+        ])
+        # input_folder = '/data/niklas/datasets/celeba/'
+        # output_folder = './data/celeba-preprocessed-v2'
         glob = '*.jpg'
-    process(input_folder, output_folder, transform, glob)
+    process(a.input_dir, a.output_dir, transform, glob)

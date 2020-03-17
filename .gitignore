@@ -1,2 +1,8 @@
 *.DS_Store
 *.swp
+venv/
+dataset/
+.vscode/
+__pycache__/
+tensorboard_logs/
+checkpoints/

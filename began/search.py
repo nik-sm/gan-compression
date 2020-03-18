@@ -80,9 +80,18 @@ def main(args):
         # Good options for starting z:
         # - start at origin (all 0)
         # - start from a normal centered at 0, try various values of std (starting smallest, maybe try 3 values)
-        mean = 0
-        std = 1
-        z = torch.nn.Parameter(torch.randn(64, device='cuda:0') * std + mean)
+
+        if args.initialization == 'uniform':
+            z = (2 * args.std) * torch.rand(64, device='cuda:0') - args.std
+        elif args.initialization == 'normal':
+            z = torch.randn(64, device='cuda:0') * args.std
+        else:
+            raise NotImplementedError(args.initialization)
+
+        # network only saw [-1, 1] during training
+        z = torch.clamp(z, -1, 1)
+
+        z = torch.nn.Parameter(z)
 
         z_initial = z.data.clone()
         optimizer = torch.optim.AdamW([z], lr=0.5e-2)
@@ -95,7 +104,13 @@ def main(args):
 
         for j in trange(args.n_steps, leave=False):
             optimizer.zero_grad()
-            #x_hat = (g(z).squeeze(0) + 1) / 2
+            if args.method == 'alternating':
+                with torch.no_grad():
+                    loss1 = F.mse_loss(g(z).squeeze(0), x)
+                    loss2 = F.mse_loss(g(-z).squeeze(0), x)
+                    if loss2 < loss1:
+                        z = -z
+
             x_hat = g(z).squeeze(0)
             mse = F.mse_loss(x_hat, x)
             mse.backward()
@@ -117,5 +132,8 @@ if __name__ == '__main__':
     p.add_argument('--run_name', default=datetime.now().isoformat())
     p.add_argument('--n_restarts', type=int, default=3)
     p.add_argument('--n_steps', type=int, default=3000)
+    p.add_argument('--method', choices=['simple', 'alternating'], default='simple')
+    p.add_argument('--initialization', choices=['uniform', 'normal'], default='uniform')
+    p.add_argument('--std', type=float, default=0.1, help='for normal dist, the std. for uniform, the min and max val')
     args = p.parse_args()
     main(args)

@@ -81,10 +81,17 @@ def main(args):
         # - start at origin (all 0)
         # - start from a normal centered at 0, try various values of std (starting smallest, maybe try 3 values)
 
+        # NOTE - based on quick experiments:
+        # - std=1.0 better than std=0.1 or std=0.01
+        # - uniform and normal performed nearly identical
         if args.initialization == 'uniform':
             z = (2 * args.std) * torch.rand(64, device='cuda:0') - args.std
         elif args.initialization == 'normal':
             z = torch.randn(64, device='cuda:0') * args.std
+        elif args.initialization == 'ones':
+            mask = torch.rand(64) < 0.5
+            z = torch.ones(64, device='cuda:0')
+            z[mask] = -1
         else:
             raise NotImplementedError(args.initialization)
 
@@ -104,7 +111,9 @@ def main(args):
 
         for j in trange(args.n_steps, leave=False):
             optimizer.zero_grad()
-            if args.method == 'alternating':
+            # NOTE - Occasionally, alternating gives equivalent results
+            # usually, it gives very bad results (an unrelated, realistic face)
+            if args.method == 'alternating': 
                 with torch.no_grad():
                     loss1 = F.mse_loss(g(z).squeeze(0), x)
                     loss2 = F.mse_loss(g(-z).squeeze(0), x)
@@ -133,7 +142,7 @@ if __name__ == '__main__':
     p.add_argument('--n_restarts', type=int, default=3)
     p.add_argument('--n_steps', type=int, default=3000)
     p.add_argument('--method', choices=['simple', 'alternating'], default='simple')
-    p.add_argument('--initialization', choices=['uniform', 'normal'], default='uniform')
+    p.add_argument('--initialization', choices=['uniform', 'normal', 'ones'], default='uniform')
     p.add_argument('--std', type=float, default=0.1, help='for normal dist, the std. for uniform, the min and max val')
     args = p.parse_args()
     main(args)

@@ -23,7 +23,7 @@ def get_dataloader(base_path, n_train=-1, train=True):
             dataset,
             batch_size=P.batch_size,
             shuffle=False,
-            num_workers=6)
+            num_workers=0)
 
 class FolderDataset(torch.utils.data.Dataset):
     """

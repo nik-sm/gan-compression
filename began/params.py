@@ -5,7 +5,9 @@ num_ups = 4 # --> Number of upsampling layers
 # train_epochs = 40  # --> Number of training epochs
 log_every = 100  # --> Number of iterations after which to log
 
-latent_dim = 64  # --> Dimensionality of latent codes
+# TODO:
+# 32, 64, 128, 256, 512
+latent_dim = 32 # --> Dimensionality of latent codes
 num_filters = 128  # --> Number of filters to use in each layer
 
 lr = 0.0001  # --> Learning rate for Adam optimizers

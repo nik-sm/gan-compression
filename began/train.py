@@ -2,7 +2,7 @@ import argparse
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms, datasets
-from torch_model import SizedGenerator, SizedDiscriminator
+from torch_model import SizedGenerator, SizedDiscriminator, SimpleGenerator
 from tqdm import tqdm, trange
 import numpy as np
 import os
@@ -37,15 +37,11 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     writer = SummaryWriter(tensorboard_path)
 
-    # if dataset == 'ffhq':
-    #     dataset_path = './data/ffhq-preprocessed'
-    # elif dataset == 'celeba':
-    #     dataset_path = './data/celeba-preprocessed-v2'
-
     dataloader = get_dataloader(dataset_path, n_train, True)
     # TODO - useful print? print(f"FolderDataset: {dataloader.dataset}")
 
-    gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+#    gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+    gen = SimpleGenerator(P.latent_dim, act=output_activ).to(device)
     disc = SizedDiscriminator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
 
     if torch.cuda.device_count() > 1:

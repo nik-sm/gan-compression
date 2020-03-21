@@ -2,7 +2,8 @@ import argparse
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms, datasets
-from torch_model import SizedGenerator, SizedDiscriminator, SimpleGenerator
+from torch_model import SizedGenerator, SizedDiscriminator
+from model import SimpleDiscriminator, SimpleGenerator
 from tqdm import tqdm, trange
 import numpy as np
 import os
@@ -42,7 +43,10 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs):
 
 #    gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
     gen = SimpleGenerator(P.latent_dim, act=output_activ).to(device)
-    disc = SizedDiscriminator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+#    disc = SizedDiscriminator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+    disc = SimpleDiscriminator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+    print(disc)
+    print(gen)
 
     if torch.cuda.device_count() > 1:
         gen = torch.nn.DataParallel(gen)

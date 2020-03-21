@@ -2,15 +2,10 @@ import torch.nn as nn
 import torch
 import math
 
-
-#class Residual(nn.Module):
-#    def __init__(self, weight, layer):
-#        super().__init__()
-#        self.weight = weight
-#        self.l = layer
-#    def forward(self, inp):
-#        return self.weight * inp + (1 - self.weight) * self.l(inp)
-
+# 100 x 128 x 128pix x 128pix
+# 100 x 256 x 64pix x 64pix
+#...
+# 100 x 1024 x 16pix x 16pix
 def downsampling_layer(k, l):
     c1 = nn.Sequential(
         nn.Conv2d(l*k, l*k, kernel_size=(3, 3), padding=1, bias=False),
@@ -83,8 +78,8 @@ class SizedGenerator(nn.Module):
 
         k = self.num_filters
         s = self.initial_size
-        fmaps = self.initial_fmaps(inp).view(-1, k, s, s)
-        chain = self.conv[0](fmaps)
+        fmaps = self.initial_fmaps(inp).view(-1, k, s, s) # 32, 128, 8, 8
+        chain = self.conv[0](fmaps) # 32, 128, 16, 16
         for conv, skip in zip(self.conv[1:], self.skip):
             chain = conv( torch.cat((chain, skip(fmaps)), dim=1 ))
 
@@ -103,8 +98,6 @@ class SizedDiscriminator(nn.Module):
         self.initial_fmaps = nn.Conv2d(3, self.num_filters, kernel_size=(3, 3), padding=1)
         self.initial_activ = nn.ELU()
 
-        self.carry = torch.tensor(1, dtype=torch.float, requires_grad=False)
-
         conv = [downsampling_layer(self.num_filters, i+1) for i in range(num_dns)]
         self.conv = nn.ModuleList(conv)
 
@@ -118,123 +111,8 @@ class SizedDiscriminator(nn.Module):
         for conv in self.conv:
             chain = conv(chain)
         latent = self.output(chain.view((-1, (self.num_dns + 1) * self.num_filters * (self.initial_size**2))))
+            # reshape (n_batch x -1)
         return self.decoder.forward(latent)
-
-class AdjustedSizedGenerator(nn.Module):
-    def __init__(self, latent_dim, num_filters, image_size, num_ups, n_layers_skipped=0, output_act='elu'):
-        super().__init__()
-        latent_dim = latent_dim * 2**n_layers_skipped
-        num_ups -= n_layers_skipped
-        self.latent_dim = latent_dim
-        self.num_filters = num_filters
-        self.output_size = image_size
-        self.initial_size = int(image_size / (2**num_ups))
-
-        self.initial_fmaps = nn.Linear(latent_dim,
-                                       (self.initial_size ** 2) * num_filters,
-                                       bias=False)
-
-        self.carry = torch.tensor(1, dtype=torch.float, requires_grad=False)
-
-        conv = [upsampling_layer(self.num_filters, with_skip=False)]
-        skip = []
-
-        # output and second to last layer are not receiving a skip
-        for i in range(num_ups):
-            conv.append(upsampling_layer(self.num_filters, with_skip=True))
-
-        for i in range(num_ups - 1):
-            skip.append(nn.Upsample(scale_factor=2**(i+1), mode="nearest"))
-
-        self.conv = nn.ModuleList(conv)
-        self.skip = nn.ModuleList(skip)
-
-        self.output_fmap = nn.Conv2d(num_filters, 3, kernel_size=(3, 3), padding=1, bias=False)
-        if output_act == 'elu':
-            self.output_act = nn.ELU()
-        elif output_act == 'sigmoid':
-            self.output_act = nn.Sigmoid()
-        else:
-            raise NotImplementedError()
-
-    def forward(self, inp):
-
-        k = self.num_filters
-        s = self.initial_size
-        fmaps = self.initial_fmaps(inp).view(-1, k, s, s)
-        chain = self.conv[0](fmaps)
-        for conv, skip in zip(self.conv[1:], self.skip):
-            chain = conv( torch.cat((chain, skip(fmaps)), dim=1 ))
-
-        return self.output_act(self.output_fmap(chain) )
-
-class SimpleGenerator(nn.Module):
-    def __init__(self, latent_dim, act='elu'):
-        """
-        Works for images of size 128x128
-        """
-        super().__init__()
-        self.latent_dim = latent_dim
-        if act == 'elu':
-            self.act = nn.ELU() 
-        else:
-            raise NotImplementedError()
-
-        self.ch = 128
-        self.initial_size = 8
-
-        self.linear = nn.Linear(self.latent_dim, self.initial_size**2 * self.ch, bias=False)
-        self.convnet = nn.Sequential(
-                UpBlock(up_scale=2, in_ch1=self.ch, in_ch2=self.ch, out_ch=self.ch, kern=(3,3), stride=(1,1), pad=(1,1), act=act),
-                UpBlock(up_scale=4, in_ch1=2*self.ch, in_ch2=self.ch, out_ch=self.ch, kern=(3,3), stride=(1,1), pad=(1,1), act=act),
-                UpBlock(up_scale=8, in_ch1=2*self.ch, in_ch2=self.ch, out_ch=self.ch, kern=(3,3), stride=(1,1), pad=(1,1), act=act),
-                UpBlock(with_skip=False,
-                    in_ch1=2*self.ch, in_ch2=self.ch, out_ch=self.ch, kern=(3,3), stride=(1,1), pad=(1,1), act=act),
-                )
-
-    def forward(self, x):
-        x = self.linear(x)
-        x = x.view(-1, self.ch, self.initial_size, self.initial_size)
-        x = self.convnet((x, x))
-        return self.act(x)
-
-class UpBlock(nn.Module):
-    def __init__(self, with_skip=True, up_scale=None, in_ch1=None, in_ch2=None, **kwargs):
-        super().__init__()
-        self.with_skip = with_skip
-        self.conv = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='nearest'),
-            ConvBlock(in_ch = in_ch1, **kwargs), # <- should expect 256 in, produces 128
-            ConvBlock(in_ch = in_ch2, **kwargs)) # <- only gets 128 in
-        if self.with_skip:
-            self.skip = nn.Upsample(scale_factor=up_scale)
-
-    def forward(self, conv_input_skip_input):
-        conv_input, skip_input = conv_input_skip_input
-        conv_output = self.conv(conv_input)
-        if self.with_skip:
-            skip_output = self.skip(skip_input)
-            return torch.cat((conv_output, skip_output), dim=1), skip_input
-        else:
-            return conv_output
-
-class ConvBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, kern, stride, pad, act='elu'):
-        super().__init__()
-        if act == 'elu':
-            self.act = nn.ELU
-        else:
-            raise NotImplementedError()
-
-        self.net = nn.Sequential(
-            nn.Conv2d(in_ch, out_ch, kern, stride, pad, bias=False),
-            # TODO - add batchnorm
-#            nn.BatchNorm2d(out_ch),
-            self.act())
-
-    def forward(self, x):
-        return self.net(x)
-
 
 """
 gen: SizedGenerator(

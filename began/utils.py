@@ -3,29 +3,40 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 from torchvision.utils import make_grid
+import torch
+
+
+def weight_init(m):
+    if isinstance(m, torch.nn.Conv2d) or isinstance(m, torch.nn.Linear):
+        torch.nn.init.xavier_uniform_(m.weight.data)
+        if m.bias is not None:
+            torch.nn.init.zeros_(m.bias.data)
+
 
 def _gen_img(img):
-    plt.figure(figsize=(16,9))
+    plt.figure(figsize=(16, 9))
     plt.imshow(img)
     plt.tight_layout()
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
     plt.close()
     buf.seek(0)
-    return buf 
+    return buf
+
 
 def save_img_tensorboard(img, writer, tag, epoch=None):
     # Rescale to [0, 1]
     img -= img.min()
     img /= img.max()
-    
-    img_buf = _gen_img(img.numpy().transpose(1,2,0))
+
+    img_buf = _gen_img(img.numpy().transpose(1, 2, 0))
     img = np.array(Image.open(img_buf))
     writer.add_image(tag, img, global_step=epoch, dataformats='HWC')
     return
 
+
 def save_grid_tensorboard(img_list, writer, tag, epoch=None):
-    grid = make_grid(img_list, scale_each=True).numpy().transpose(1,2,0)
+    grid = make_grid(img_list, scale_each=True).numpy().transpose(1, 2, 0)
     img_buf = _gen_img(grid)
     img = np.array(Image.open(img_buf))
     writer.add_image(tag, img, global_step=epoch, dataformats='HWC')

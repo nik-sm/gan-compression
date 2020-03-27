@@ -3,38 +3,17 @@ from datetime import datetime
 import math
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 import numpy as np
-import sys
 from PIL import Image
-from torch_model import SizedGenerator, SizedDiscriminator, AdjustedSizedGenerator
+from torch_model import SizedGenerator
 import os
 from tqdm import trange
 
 import params as P
-from utils import save_img_tensorboard
+from utils import save_img_tensorboard, load_trained_generator
 
-def load_trained_generator(generator_checkpoint):
-    #gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups)
-    gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups) #n_layers_skipped=0)
-#    gen = torch.nn.DataParallel(gen)
-    try:
-        ckpt = torch.load(generator_checkpoint)['model_state_dict']
-        fixed_ckpt = {}
-        for k, v in ckpt.items():
-            if k.startswith('module.'):
-                fixed_ckpt[k[7:]] = v
-            else:
-                fixed_ckpt[k] = v
-        gen.load_state_dict(fixed_ckpt)
-    except Exception as e:
-        print(e)
-        gen.load_state_dict(torch.load(generator_checkpoint))
-
-    gen.eval()
-    return gen.to('cuda:0')
 
 def load_target_image(filename):
     if filename.endswith('.pt'):
@@ -68,7 +47,7 @@ def main(args):
     x = load_target_image(args.image)
     save_img_tensorboard(x.squeeze(0).detach().cpu(), writer, f'original')
 
-    g = load_trained_generator(args.generator_checkpoint)
+    g = load_trained_generator(SizedGenerator, args.generator_checkpoint, latent_dim=64, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups)
 
     save_every_n = 50
 
@@ -142,7 +121,7 @@ if __name__ == '__main__':
     p.add_argument('--n_restarts', type=int, default=3)
     p.add_argument('--n_steps', type=int, default=3000)
     p.add_argument('--method', choices=['simple', 'alternating'], default='simple')
-    p.add_argument('--initialization', choices=['uniform', 'normal', 'ones'], default='uniform')
-    p.add_argument('--std', type=float, default=0.1, help='for normal dist, the std. for uniform, the min and max val')
+    p.add_argument('--initialization', choices=['uniform', 'normal', 'ones'], default='normal')
+    p.add_argument('--std', type=float, default=1.0, help='for normal dist, the std. for uniform, the min and max val')
     args = p.parse_args()
     main(args)

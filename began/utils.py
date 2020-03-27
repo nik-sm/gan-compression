@@ -41,3 +41,23 @@ def save_grid_tensorboard(img_list, writer, tag, epoch=None):
     img = np.array(Image.open(img_buf))
     writer.add_image(tag, img, global_step=epoch, dataformats='HWC')
     return
+
+
+def load_trained_generator(generator_class, generator_checkpoint, *gen_args, **gen_kwargs):
+    #gen = generator_class(64, P.num_filters, P.size, P.num_ups)
+    gen = generator_class(*gen_args, **gen_kwargs)
+    try:
+        ckpt = torch.load(generator_checkpoint)['model_state_dict']
+        fixed_ckpt = {}
+        for k, v in ckpt.items():
+            if k.startswith('module.'):
+                fixed_ckpt[k[7:]] = v
+            else:
+                fixed_ckpt[k] = v
+        gen.load_state_dict(fixed_ckpt)
+    except Exception as e:
+        print(e)
+        gen.load_state_dict(torch.load(generator_checkpoint))
+
+    gen.eval()
+    return gen.to('cuda:0')

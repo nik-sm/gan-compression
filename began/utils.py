@@ -43,8 +43,7 @@ def save_grid_tensorboard(img_list, writer, tag, epoch=None):
     return
 
 
-def load_trained_generator(generator_class, generator_checkpoint, *gen_args, **gen_kwargs):
-    #gen = generator_class(64, P.num_filters, P.size, P.num_ups)
+def load_trained_generator(generator_class, generator_checkpoint, device, *gen_args, **gen_kwargs):
     gen = generator_class(*gen_args, **gen_kwargs)
     try:
         ckpt = torch.load(generator_checkpoint)['model_state_dict']
@@ -59,5 +58,21 @@ def load_trained_generator(generator_class, generator_checkpoint, *gen_args, **g
         print(e)
         gen.load_state_dict(torch.load(generator_checkpoint))
 
-    gen.eval()
-    return gen.to('cuda:0')
+    return gen.to(device)
+
+def load_trained_disc(d_class, d_checkpoint, device, *d_args, **d_kwargs):
+    d = d_class(*d_args, **d_kwargs)
+    try:
+        ckpt = torch.load(d_checkpoint)['model_state_dict']
+        fixed_ckpt = {}
+        for k, v in ckpt.items():
+            if k.startswith('module.'):
+                fixed_ckpt[k[7:]] = v
+            else:
+                fixed_ckpt[k] = v
+        d.load_state_dict(fixed_ckpt)
+    except Exception as e:
+        print(e)
+        d.load_state_dict(torch.load(d_checkpoint))
+
+    return d.to(device)

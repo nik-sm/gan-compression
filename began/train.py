@@ -10,6 +10,7 @@ import os
 
 import params as P
 from dataloaders import get_dataloader, AVAIL_DATALOADERS
+from utils import load_trained_generator, load_trained_disc
 
 def save(path, epoch, model, optimizer, scheduler):
     torch.save({
@@ -31,20 +32,67 @@ def load(path, model, optimizer, scheduler):
 def ac_loss(input, disc):
     return torch.mean(torch.abs(input - disc.forward(input)))  # pixelwise L1 - for each pixel for each image in the batch
 
-def main(dataset, dataset_path, run_name, n_train, output_activ, epochs, latent_dim):
-    checkpoint_path = f"checkpoints/{dataset}_{run_name}"
-    tensorboard_path = f"tensorboard_logs/{dataset}_{run_name}"
+def main(args):
+
+    # Look for starting checkpoints (if avaialble)
+    # TODO - left off here
+    # Could have a folder for gen_128_ckpts, gen_256_ckpts, etc
+    # inside each folder, we have epoch checkpoints for resuming after crash/kill
+    if available_checkpoints_for_resuming:
+        gen_checkpoint=...
+        disc_checkpoint=...
+    else:
+        gen_checkpoint=None
+        disc_checkpoint=None
+
+    for l in args.latent_dims:
+        gen_checkpoint, disc_checkpoint = single_latent_dim(args, l, gen_checkpoint, disc_checkpoint)
+
+
+def single_latent_dim(args, latent_dim, gen_checkpoint=None, disc_checkpoint=None):
+    """
+    We warm-start both the gen and disc to keep things "balanced".
+    """
+    checkpoint_path = f"checkpoints/{args.dataset}_{args.run_name}"
+    tensorboard_path = f"tensorboard_logs/{args.dataset}_{args.run_name}"
     torch.backends.cudnn.benchmark = True
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     writer = SummaryWriter(tensorboard_path)
 
-    dataloader = get_dataloader(dataset_path, n_train, True)
-    # TODO - useful print? print(f"FolderDataset: {dataloader.dataset}")
+    dataloader = get_dataloader(args.dataset_dir, args.n_train, True)
 
-#    gen = SizedGenerator(latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
-    gen = SimpleGenerator(latent_dim, act=output_activ).to(device)
-#    disc = SizedDiscriminator(latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
-    disc = SimpleDiscriminator(latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+        # ways to deal with linear layer (assume we are doing 64 --> 512)
+        # - fix the first 64 in each row, random the rest
+        # - F.interpolate(64, 512)
+        # - totally random init 512
+
+    # Create or load the Generator
+    gen_args = [latent_dim]
+    gen_kwargs = {'act': args.output_activ}
+    if gen_checkpoint is not None:
+        print(f"loading generator checkpoint: {gen_checkpoint}")
+        gen = load_trained_generator(SimpleGenerator, gen_checkpoint, device, *gen_args, **gen_kwargs)
+        gen.linear = nn.Linear(
+                latent_dim, gen.initial_size**2 * gen.ch ,bias=False)
+    else:
+        gen = SimpleGenerator(*gen_args, **gen_kwargs).to(device)
+
+    # Create or load the Discriminator
+    d_args = [latent_dim, P.num_filters, P.size, P.num_ups, args.output_activ]
+    d_kwargs = {}
+    if disc_checkpoint is not None:
+        print(f"loading discriminator checkpoint: {disc_checkpoint}")
+        disc = load_trained_generator(SimpleDiscriminator, disc_checkpoint, device, *d_args, **d_kwargs)
+        disc.linear = nn.Linear(disc.shape_after_conv, latent_dim, bias=False)
+        disc.decoder.linear = nn.Linear(
+                latent_dim, disc.decoder.initial_size**2 * disc.decoder.ch, bias=False)
+
+    else:
+        disc = SimpleDiscriminator(*d_args, **d_kwargs).to(device)
+
+    gen.train()
+    disc.train()
+
     print(disc)
     print(gen)
 
@@ -52,10 +100,15 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs, latent_
         gen = torch.nn.DataParallel(gen)
         disc = torch.nn.DataParallel(disc)
 
+    # NOTE - might consider changing optimizer+scheduler to something like:
+    # adamW, lr=0.0002, betas=(0.5, 0.999)
+    # CosineAnnealingLR(...T_max=args.epochs)
+
     gen_optimizer = torch.optim.Adam(gen.parameters(), P.lr)
     gen_scheduler = torch.optim.lr_scheduler.StepLR(gen_optimizer, gamma=0.95, step_size=P.lr_update_step)
     disc_optimizer = torch.optim.Adam(disc.parameters(), P.lr)
     disc_scheduler = torch.optim.lr_scheduler.StepLR(disc_optimizer, gamma=0.95, step_size=P.lr_update_step)
+
     current_checkpoint = 0
     if (not os.path.exists(checkpoint_path)):
         os.makedirs(checkpoint_path)
@@ -92,7 +145,7 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs, latent_
     n_disc_param = sum([x.numel() for x in disc.parameters() if x.requires_grad])
     print(f"{n_gen_param + n_disc_param} Trainable Parameters")
 
-    for e in trange(current_checkpoint, epochs, initial=current_checkpoint, leave=True):
+    for e in trange(current_checkpoint, args.epochs, initial=current_checkpoint, leave=True):
         for i, img_batch in tqdm(enumerate(dataloader), total=len(dataloader), leave=False):
             disc_optimizer.zero_grad()
             gen_optimizer.zero_grad()
@@ -152,14 +205,17 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs, latent_
         save(os.path.join(checkpoint_path, f"disc_ckpt.{e}.pt"), e, disc, disc_optimizer, disc_scheduler)
 
 
+def str2list(s):
+    return [int(x) for x in s.split(',')]
+
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--dataset', choices=AVAIL_DATALOADERS, required=True)
-    p.add_argument('--latent_dim', type=int, default=64)
+    p.add_argument('--latent_dims', type=str2list, default=[64], help='Comma-separated list of dimensions, no spaces. For example, --latent_dims 64,128,256 ')
     p.add_argument('--dataset_dir', required=True)
     p.add_argument('--epochs', type=int, default=30)
     p.add_argument('--run_name', required=True)
     p.add_argument('--n_train', type=int, default=-1)
     p.add_argument('--output_activ', choices=['elu','sigmoid'], default='elu')
     args = p.parse_args()
-    main(args.dataset, args.dataset_dir, args.run_name, args.n_train, args.output_activ, args.epochs, args.latent_dim)
+    main(args)

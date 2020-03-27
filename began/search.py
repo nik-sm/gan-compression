@@ -47,7 +47,8 @@ def main(args):
     x = load_target_image(args.image)
     save_img_tensorboard(x.squeeze(0).detach().cpu(), writer, f'original')
 
-    g = load_trained_generator(SizedGenerator, args.generator_checkpoint, latent_dim=64, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups)
+    g = load_trained_generator(SizedGenerator, args.generator_checkpoint, 'cuda:0', latent_dim=64, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups)
+    g.eval()
 
     save_every_n = 50
 
@@ -64,12 +65,12 @@ def main(args):
         # - std=1.0 better than std=0.1 or std=0.01
         # - uniform and normal performed nearly identical
         if args.initialization == 'uniform':
-            z = (2 * args.std) * torch.rand(64, device='cuda:0') - args.std
+            z = (2 * args.std) * torch.rand(8192, device='cuda:0') - args.std
         elif args.initialization == 'normal':
-            z = torch.randn(64, device='cuda:0') * args.std
+            z = torch.randn(8192, device='cuda:0') * args.std
         elif args.initialization == 'ones':
-            mask = torch.rand(64) < 0.5
-            z = torch.ones(64, device='cuda:0')
+            mask = torch.rand(8192) < 0.5
+            z = torch.ones(8192, device='cuda:0')
             z[mask] = -1
         else:
             raise NotImplementedError(args.initialization)

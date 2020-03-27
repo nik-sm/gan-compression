@@ -7,7 +7,7 @@ log_every = 100  # --> Number of iterations after which to log
 
 # TODO:
 # 32, 64, 128, 256, 512
-latent_dim = 64 # --> Dimensionality of latent codes
+#latent_dim = 64 # --> Dimensionality of latent codes
 num_filters = 128  # --> Number of filters to use in each layer
 
 lr = 0.0001  # --> Learning rate for Adam optimizers

@@ -31,7 +31,7 @@ def load(path, model, optimizer, scheduler):
 def ac_loss(input, disc):
     return torch.mean(torch.abs(input - disc.forward(input)))  # pixelwise L1 - for each pixel for each image in the batch
 
-def main(dataset, dataset_path, run_name, n_train, output_activ, epochs):
+def main(dataset, dataset_path, run_name, n_train, output_activ, epochs, latent_dim):
     checkpoint_path = f"checkpoints/{dataset}_{run_name}"
     tensorboard_path = f"tensorboard_logs/{dataset}_{run_name}"
     torch.backends.cudnn.benchmark = True
@@ -41,10 +41,10 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs):
     dataloader = get_dataloader(dataset_path, n_train, True)
     # TODO - useful print? print(f"FolderDataset: {dataloader.dataset}")
 
-#    gen = SizedGenerator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
-    gen = SimpleGenerator(P.latent_dim, act=output_activ).to(device)
-#    disc = SizedDiscriminator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
-    disc = SimpleDiscriminator(P.latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+#    gen = SizedGenerator(latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+    gen = SimpleGenerator(latent_dim, act=output_activ).to(device)
+#    disc = SizedDiscriminator(latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
+    disc = SimpleDiscriminator(latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
     print(disc)
     print(gen)
 
@@ -86,7 +86,7 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs):
     k = 0
 
     # Uniform from -1 to 1
-    const_sample = ((2 * torch.rand((P.batch_size, P.latent_dim), dtype=torch.float)) - 1).to(device)
+    const_sample = ((2 * torch.rand((P.batch_size, latent_dim), dtype=torch.float)) - 1).to(device)
 
     n_gen_param = sum([x.numel() for x in gen.parameters() if x.requires_grad])
     n_disc_param = sum([x.numel() for x in disc.parameters() if x.requires_grad])
@@ -107,8 +107,8 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs):
             img_batch = img_batch.to(device)
 
             # Uniform from -1 to 1
-            d_latent_sample = ((2 * torch.rand((P.batch_size, P.latent_dim), dtype=torch.float)) - 1).to(device)
-            g_latent_sample = ((2 * torch.rand((P.batch_size, P.latent_dim), dtype=torch.float)) - 1).to(device)
+            d_latent_sample = ((2 * torch.rand((P.batch_size, latent_dim), dtype=torch.float)) - 1).to(device)
+            g_latent_sample = ((2 * torch.rand((P.batch_size, latent_dim), dtype=torch.float)) - 1).to(device)
 
             batch_ac_loss = ac_loss(img_batch, disc)
             d_fake_ac_loss = ac_loss(gen.forward(d_latent_sample).detach(), disc)
@@ -155,10 +155,11 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs):
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--dataset', choices=AVAIL_DATALOADERS, required=True)
+    p.add_argument('--latent_dim', type=int, default=64)
     p.add_argument('--dataset_dir', required=True)
     p.add_argument('--epochs', type=int, default=30)
     p.add_argument('--run_name', required=True)
     p.add_argument('--n_train', type=int, default=-1)
     p.add_argument('--output_activ', choices=['elu','sigmoid'], default='elu')
     args = p.parse_args()
-    main(args.dataset, args.dataset_dir, args.run_name, args.n_train, args.output_activ, args.epochs)
+    main(args.dataset, args.dataset_dir, args.run_name, args.n_train, args.output_activ, args.epochs, args.latent_dim)

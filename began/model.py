@@ -1,7 +1,6 @@
 import torch.nn as nn
 import torch
 
-
 class SimpleDiscriminator(nn.Module):
     def __init__(self, latent_dim, num_filters, image_size, num_dns, act='elu'):
         super().__init__()
@@ -86,8 +85,9 @@ class SimpleGenerator(nn.Module):
             nn.Conv2d(self.ch, 3, kernel_size=(3, 3), padding=1, bias=False),
             self.act)
 
-    def forward(self, x):
-        x = self.linear(x)
+    def forward(self, x, skip_linear_layer=False):
+        if not skip_linear_layer:
+            x = self.linear(x)
         x = x.view(-1, self.ch, self.initial_size, self.initial_size)
         x = self.conv_net((x, x))
         return x

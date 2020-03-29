@@ -74,12 +74,14 @@ class SizedGenerator(nn.Module):
         else:
             raise NotImplementedError()
 
-    def forward(self, inp):
+    def forward(self, inp, skip_linear_layer=False):
 
         k = self.num_filters
         s = self.initial_size
-        #fmaps = self.initial_fmaps(inp).view(-1, k, s, s) # 32, 128, 8, 8
-        fmaps = inp.view(-1, k, s, s) # 32, 128, 8, 8
+        if skip_linear_layer:
+            fmaps = inp.view(-1, k, s, s) # 32, 128, 8, 8
+        else:
+            fmaps = self.initial_fmaps(inp).view(-1, k, s, s) # 32, 128, 8, 8
         chain = self.conv[0](fmaps) # 32, 128, 16, 16
         for conv, skip in zip(self.conv[1:], self.skip):
             chain = conv( torch.cat((chain, skip(fmaps)), dim=1 ))

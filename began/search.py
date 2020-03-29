@@ -49,6 +49,7 @@ def main(args):
 
     g = load_trained_generator(SizedGenerator, args.generator_checkpoint, 'cuda:0', latent_dim=64, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups)
     g.eval()
+    args.skip_linear_layer = (args.latent_dim != g.latent_dim)
 
     save_every_n = 50
 
@@ -86,21 +87,21 @@ def main(args):
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma)
 
         with torch.no_grad():
-            #breakpoint()
             save_img_tensorboard(g(z_initial).squeeze(0).detach().cpu(), writer, f'restart_{i}/beginning')
+
+
+        # TODO - try this for:
+        # - 64, 4096, 5000, 8192
+        # Could repeat this loop, looking for the minimum value that reaches a target PSNR
+        if args.skip_linear_layer:
+            linear_layer = torch.nn.Linear(args.latent_dim, 8192, device='cuda:0')
+        else:
+            linear_layer = lambda x: x
 
         for j in trange(args.n_steps, leave=False):
             optimizer.zero_grad()
-            # NOTE - Occasionally, alternating gives equivalent results
-            # usually, it gives very bad results (an unrelated, realistic face)
-            if args.method == 'alternating': 
-                with torch.no_grad():
-                    loss1 = F.mse_loss(g(z).squeeze(0), x)
-                    loss2 = F.mse_loss(g(-z).squeeze(0), x)
-                    if loss2 < loss1:
-                        z = -z
-
-            x_hat = g(z).squeeze(0)
+            model_input = linear_layer(z)
+            x_hat = g(model_input, skip_linear_layer=args.skip_linear_layer).squeeze(0)
             mse = F.mse_loss(x_hat, x)
             mse.backward()
             optimizer.step()
@@ -114,6 +115,12 @@ def main(args):
 
         save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/final')
 
+def get_latent_dims(x):
+    x = int(x)
+    if x >= 8192:
+        raise ValueError('give a latent_dim between [1, 8192]')
+    return x
+
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--generator_checkpoint', required=True, help="Ex.: --generator_checkpoint ./checkpoints/celeba_50k/gen_ckpt.20.pt")
@@ -121,8 +128,11 @@ if __name__ == '__main__':
     p.add_argument('--run_name', default=datetime.now().isoformat())
     p.add_argument('--n_restarts', type=int, default=3)
     p.add_argument('--n_steps', type=int, default=3000)
-    p.add_argument('--method', choices=['simple', 'alternating'], default='simple')
     p.add_argument('--initialization', choices=['uniform', 'normal', 'ones'], default='normal')
     p.add_argument('--std', type=float, default=1.0, help='for normal dist, the std. for uniform, the min and max val')
+    p.add_argument('--latent_dim', type=get_latent_dims, default=4096, help='int between [1, 8192]')
     args = p.parse_args()
+
+    # TODO - if model used latent_dim=64 and you also wanan reconstruct from 64, 
+    # does it hurt to just skip linear layer?
     main(args)

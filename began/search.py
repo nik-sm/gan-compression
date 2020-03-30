@@ -25,7 +25,7 @@ def load_target_image(filename):
             transforms.Resize(P.size),
             transforms.ToTensor()])
         x = t(image)
-    return x.to('cuda:0')
+    return x
 
 def psnr(img1, img2):
     mse = F.mse_loss(img1, img2)
@@ -44,12 +44,24 @@ def main(args):
 
     writer = SummaryWriter(logdir)
 
-    x = load_target_image(args.image)
+    device='cuda:0' 
+
+    x = load_target_image(args.image).to(device)
     save_img_tensorboard(x.squeeze(0).detach().cpu(), writer, f'original')
 
-    g = load_trained_generator(SizedGenerator, args.generator_checkpoint, 'cuda:0', latent_dim=64, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups)
+    g = load_trained_generator(SizedGenerator, args.generator_checkpoint, device, latent_dim=64, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups)
     g.eval()
-    args.skip_linear_layer = (args.latent_dim != g.latent_dim)
+
+    if args.latent_dim != g.latent_dim:
+        args.skip_linear_layer = True
+    else:
+        args.skip_linear_layer = False
+
+    if args.skip_linear_layer and args.latent_dim < 8192:
+        # Then we need a new linear layer to map to dimension 8192
+        linear_layer = torch.nn.Linear(args.latent_dim, 8192).to(device)
+    else:
+        linear_layer = lambda x: x
 
     save_every_n = 50
 
@@ -58,45 +70,30 @@ def main(args):
         torch.manual_seed(seed)
         np.random.seed(seed)
 
-        # Good options for starting z:
-        # - start at origin (all 0)
-        # - start from a normal centered at 0, try various values of std (starting smallest, maybe try 3 values)
-
         # NOTE - based on quick experiments:
         # - std=1.0 better than std=0.1 or std=0.01
         # - uniform and normal performed nearly identical
         if args.initialization == 'uniform':
-            z = (2 * args.std) * torch.rand(8192, device='cuda:0') - args.std
+            z = (2 * args.std) * torch.rand(args.latent_dim, device=device) - args.std
         elif args.initialization == 'normal':
-            z = torch.randn(8192, device='cuda:0') * args.std
+            z = torch.randn(args.latent_dim, device=device) * args.std
         elif args.initialization == 'ones':
-            mask = torch.rand(8192) < 0.5
-            z = torch.ones(8192, device='cuda:0')
+            mask = torch.rand(args.latent_dim) < 0.5
+            z = torch.ones(args.latent_dim, device=device)
             z[mask] = -1
         else:
             raise NotImplementedError(args.initialization)
 
         # network only saw [-1, 1] during training
-        z = torch.clamp(z, -1, 1)
-
-        z = torch.nn.Parameter(z)
+        z = torch.nn.Parameter(torch.clamp(z, -1, 1))
 
         z_initial = z.data.clone()
-        optimizer = torch.optim.AdamW([z], lr=0.5e-2)
-        gamma = 2 ** (math.log(0.25, 2) / args.n_steps) # Want to hit 0.25*initial_lr after n_steps steps (arbitrary design)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma)
+        optimizer = torch.optim.Adam([z], lr=0.05, betas=(0.5, 0.999))
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.n_steps)
 
         with torch.no_grad():
-            save_img_tensorboard(g(z_initial).squeeze(0).detach().cpu(), writer, f'restart_{i}/beginning')
-
-
-        # TODO - try this for:
-        # - 64, 4096, 5000, 8192
-        # Could repeat this loop, looking for the minimum value that reaches a target PSNR
-        if args.skip_linear_layer:
-            linear_layer = torch.nn.Linear(args.latent_dim, 8192, device='cuda:0')
-        else:
-            linear_layer = lambda x: x
+            model_input = linear_layer(z_initial)
+            save_img_tensorboard(g(model_input, skip_linear_layer=args.skip_linear_layer).squeeze(0).detach().cpu(), writer, f'restart_{i}/beginning')
 
         for j in trange(args.n_steps, leave=False):
             optimizer.zero_grad()
@@ -117,13 +114,13 @@ def main(args):
 
 def get_latent_dims(x):
     x = int(x)
-    if x >= 8192:
+    if x > 8192:
         raise ValueError('give a latent_dim between [1, 8192]')
     return x
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('--generator_checkpoint', required=True, help="Ex.: --generator_checkpoint ./checkpoints/celeba_50k/gen_ckpt.20.pt")
+    p.add_argument('--generator_checkpoint', default='./checkpoints/celeba_cropped/gen_ckpt.49.pt', help="Path to generator checkpoint")
     p.add_argument('--image', required=True)
     p.add_argument('--run_name', default=datetime.now().isoformat())
     p.add_argument('--n_restarts', type=int, default=3)

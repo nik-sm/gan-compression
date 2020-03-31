@@ -6,3 +6,4 @@ dataset/
 __pycache__/
 tensorboard_logs/
 checkpoints/
+*.out

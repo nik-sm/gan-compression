@@ -60,19 +60,55 @@ def load_trained_generator(generator_class, generator_checkpoint, device, *gen_a
 
     return gen.to(device)
 
-def load_trained_disc(d_class, d_checkpoint, device, *d_args, **d_kwargs):
-    d = d_class(*d_args, **d_kwargs)
-    try:
-        ckpt = torch.load(d_checkpoint)['model_state_dict']
-        fixed_ckpt = {}
-        for k, v in ckpt.items():
-            if k.startswith('module.'):
-                fixed_ckpt[k[7:]] = v
-            else:
-                fixed_ckpt[k] = v
-        d.load_state_dict(fixed_ckpt)
-    except Exception as e:
-        print(e)
-        d.load_state_dict(torch.load(d_checkpoint))
 
-    return d.to(device)
+def save_gif(gen_checkpoints, n_row=2, n_col=3, gen_class=SimpleGenerator):
+    """
+    TODO - work-in-progress
+    Input:
+        gen_checkpoints: list of filenames of pretrained generator checkpoints
+        n_row: the final GIF will have 'n_row' rows
+        n_col: the final GIF will have 'n_col' cols
+        gen_class: the python class of the generator
+
+    Output:
+        saves 1 GIF, containing 1 frame per checkpoint. In each frame, we see the 
+        same (n_row x n_col) latent points, and how they look at the current timestep.
+    """
+    # TODO - settings
+    latent_dim = 64 
+    gen_args = []
+    gen_kwargs = {}
+    device = 'cuda:0'
+    output_dir = 'movies'
+    output_name = 'TEST.gif'
+
+    # We need to select n_row * n_col points to track through time
+    z = torch.randn(n_row * n_col, latent_dim, device=device))
+    movie = []
+
+    # Generate the frames
+    for c in gen_checkpoints:
+        g = load_trained_generator(gen_class, c, *gen_args, **gen_kwargs)
+        g.eval()
+
+        # Produce a batch of images, shape ((n_row * n_col) x H x W x Channel)
+        batch = g(z).detach().to('cpu')
+        img_height = batch.shape[1]
+        img_width = batch.shape[2]
+        n_channels = batch.shape[3]
+
+        # Normalize each face in the frame separately
+        batch -= batch.view(n_row * n_col, -1).min(1).values[:,None,None,None]
+        batch /= batch.view(n_row * n_col, -1).max(1).values[:,None,None,None]
+
+        # Reshape the batch, stacking the individual faces around into a grid of shape
+        # n_row by n_col
+        frame = batch.numpy().reshape(n_row * img_height, n_col * img_width, n_channels).
+
+        movie.append(frame)
+
+    # Write the GIF
+    fps = 2
+    filename = join(output_dir, output_name)
+    ImageSequenceClip(movie).write_gif(filename, fps=fps)
+    return

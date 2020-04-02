@@ -1,9 +1,15 @@
 import io
 import matplotlib.pyplot as plt
+from moviepy.editor import ImageSequenceClip
+from model import SimpleGenerator
 import numpy as np
+from os.path import join
+import params as P
 from PIL import Image
-from torchvision.utils import make_grid
 import torch
+import torch.nn.functional as F
+from torchvision import transforms
+from torchvision.utils import make_grid
 
 
 def weight_init(m):
@@ -43,7 +49,7 @@ def save_grid_tensorboard(img_list, writer, tag, epoch=None):
     return
 
 
-def load_trained_generator(generator_class, generator_checkpoint, device, *gen_args, **gen_kwargs):
+def load_trained_generator(generator_class, generator_checkpoint, *gen_args, **gen_kwargs):
     gen = generator_class(*gen_args, **gen_kwargs)
     try:
         ckpt = torch.load(generator_checkpoint)['model_state_dict']
@@ -58,7 +64,24 @@ def load_trained_generator(generator_class, generator_checkpoint, device, *gen_a
         print(e)
         gen.load_state_dict(torch.load(generator_checkpoint))
 
-    return gen.to(device)
+    return gen
+
+
+def jpeg_compress(img, quality_layers, quality_mode='rates'):
+    """
+        quality_mode: 'rates' - compression ratio. 'dB' - SNR value in decibels
+
+    Example usage:
+        i = 'images/bananas.jpg'
+        results = jpeg_compress(i, [30], 'dB')
+        results.save('test.jpg')
+
+    """
+    img = Image.open(img)
+    outputIoStream = io.BytesIO()
+    img.save(outputIoStream, "JPEG2000", quality_mode=quality_mode, quality_layers=quality_layers)
+    outputIoStream.seek(0)
+    return Image.open(outputIoStream)
 
 
 def save_gif(gen_checkpoints, n_row=2, n_col=3, gen_class=SimpleGenerator):
@@ -83,7 +106,7 @@ def save_gif(gen_checkpoints, n_row=2, n_col=3, gen_class=SimpleGenerator):
     output_name = 'TEST.gif'
 
     # We need to select n_row * n_col points to track through time
-    z = torch.randn(n_row * n_col, latent_dim, device=device))
+    z = torch.randn(n_row * n_col, latent_dim, device=device)
     movie = []
 
     # Generate the frames
@@ -103,7 +126,7 @@ def save_gif(gen_checkpoints, n_row=2, n_col=3, gen_class=SimpleGenerator):
 
         # Reshape the batch, stacking the individual faces around into a grid of shape
         # n_row by n_col
-        frame = batch.numpy().reshape(n_row * img_height, n_col * img_width, n_channels).
+        frame = batch.numpy().reshape(n_row * img_height, n_col * img_width, n_channels)
 
         movie.append(frame)
 
@@ -112,3 +135,29 @@ def save_gif(gen_checkpoints, n_row=2, n_col=3, gen_class=SimpleGenerator):
     filename = join(output_dir, output_name)
     ImageSequenceClip(movie).write_gif(filename, fps=fps)
     return
+
+
+def load_target_image(filename):
+    if filename.endswith('.pt'):
+        x = torch.load(filename)
+    else:
+        image = Image.open(filename)
+        t = transforms.Compose([
+            # TODO - ideal is:
+            # - if img rectangular, cut into square
+            # - then resize to (P.size, P.size)
+            transforms.Resize((P.size, P.size)),
+            transforms.ToTensor()])
+        x = t(image)
+    return x
+
+
+def psnr(img1, img2):
+    mse = F.mse_loss(img1, img2)
+    if mse == 0:
+        raise ValueError("how do we handle a perfect reconstruction?")
+    pixel_max = torch.tensor(1.0)
+    p = 20 * torch.log10(pixel_max) - 10 * torch.log10(mse)
+    if isinstance(p. torch.Tensor):
+        p = p.item()
+    return p

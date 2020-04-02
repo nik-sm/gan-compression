@@ -1,11 +1,9 @@
 import argparse
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from torchvision import transforms, datasets
 from torch_model import SizedGenerator, SizedDiscriminator
 from model import SimpleDiscriminator, SimpleGenerator
 from tqdm import tqdm, trange
-import numpy as np
 import os
 
 import params as P

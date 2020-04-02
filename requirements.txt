@@ -1,3 +1,4 @@
+flake8
 numpy
 tqdm
 torch==1.4.0

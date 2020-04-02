@@ -1,48 +1,23 @@
 import argparse
 from datetime import datetime
-import math
 import torch
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-from torchvision import transforms
 import numpy as np
-from PIL import Image
 from torch_model import SizedGenerator
 import os
 from tqdm import trange
 from torchvision.utils import save_image, make_grid
 
 import params as P
-from utils import save_img_tensorboard, load_trained_generator
+from utils import save_img_tensorboard, load_trained_generator, load_target_image, psnr
 
-
-
-def load_target_image(filename):
-    if filename.endswith('.pt'):
-        x = torch.load(filename)
-    else:
-        image = Image.open(filename)
-        t = transforms.Compose([
-            # TODO - ideal is:
-            # - if img rectangular, cut into square
-            # - then resize to (P.size, P.size)
-            transforms.Resize((P.size, P.size)),
-            transforms.ToTensor()])
-        x = t(image)
-    return x
-
-def psnr(img1, img2):
-    mse = F.mse_loss(img1, img2)
-    if mse == 0:
-        raise ValueError("how do we handle a perfect reconstruction?")
-    pixel_max = torch.tensor(1.0)
-    return 20 * torch.log10(pixel_max) - 10 * torch.log10(mse)
 
 def output_to_imshow(v):
     return v.squeeze(0).detach().to('cpu').numpy().transpose(1,2,0)
 
-def main(args):
 
+def main(args):
     logdir = f'tensorboard_logs/search/{args.run_name}'
     os.makedirs(logdir, exist_ok=True) # TODO - decide whether to clobber or what?
 
@@ -53,7 +28,7 @@ def main(args):
     x = load_target_image(args.image).to(device)
     save_img_tensorboard(x.squeeze(0).detach().cpu(), writer, f'original')
 
-    g = load_trained_generator(SizedGenerator, args.generator_checkpoint, device, latent_dim=64, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups)
+    g = load_trained_generator(SizedGenerator, args.generator_checkpoint, latent_dim=64, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups).to(device)
     g.eval()
 
     if args.latent_dim != g.latent_dim:
@@ -117,11 +92,13 @@ def main(args):
         save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/final')
         save_image(make_grid([x, x_hat.squeeze(0)], nrow=2), f'{args.run_name}.png')
 
+
 def get_latent_dims(x):
     x = int(x)
     if x > 8192:
         raise ValueError('give a latent_dim between [1, 8192]')
     return x
+
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()

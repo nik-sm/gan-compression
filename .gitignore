@@ -7,3 +7,6 @@ __pycache__/
 tensorboard_logs/
 checkpoints/
 *.out
+data/*
+py37/*
+images/

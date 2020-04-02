@@ -10,9 +10,11 @@ from PIL import Image
 from torch_model import SizedGenerator
 import os
 from tqdm import trange
+from torchvision.utils import save_image, make_grid
 
 import params as P
 from utils import save_img_tensorboard, load_trained_generator
+
 
 
 def load_target_image(filename):
@@ -21,8 +23,10 @@ def load_target_image(filename):
     else:
         image = Image.open(filename)
         t = transforms.Compose([
-            #transforms.CenterCrop(P.size), # NOTE - we should carefully crop target images
-            transforms.Resize(P.size),
+            # TODO - ideal is:
+            # - if img rectangular, cut into square
+            # - then resize to (P.size, P.size)
+            transforms.Resize((P.size, P.size)),
             transforms.ToTensor()])
         x = t(image)
     return x
@@ -111,6 +115,7 @@ def main(args):
                 save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/reconstruction', j)
 
         save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/final')
+        save_image(make_grid([x, x_hat.squeeze(0)], nrow=2), f'{args.run_name}.png')
 
 def get_latent_dims(x):
     x = int(x)

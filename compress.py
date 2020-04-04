@@ -53,15 +53,8 @@ def compress(img, compression_ratio, output_filename=None, n_steps=5000, gen_ckp
     g = load_trained_generator(DEFAULT_GEN_CLASS, gen_ckpt, latent_dim=GEN_LATENT_DIM, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups).to(DEVICE)
     g.eval()
 
-
-    # Decide how to handle linear layer, based on compression_ratio
-    torch.manual_seed(0)
-    np.random.seed(0)
-
-    # Round down to nearest integer for latent_dim
-    latent_dim = (128*128*3) // compression_ratio
-
-    linear_layer = torch.nn.Linear(latent_dim, 8192).to(DEVICE)
+    latent_dim = get_latent_dim(compression_ratio)
+    linear_layer = get_linear_layer(latent_dim)
 
     z = torch.randn(latent_dim, device=DEVICE)
     z = torch.nn.Parameter(torch.clamp(z, -1, 1))
@@ -87,10 +80,21 @@ def compress(img, compression_ratio, output_filename=None, n_steps=5000, gen_ckp
     return x_hat, z, p
 
 
+def get_latent_dim(compression_ratio):
+    # Round down to nearest integer for latent_dim
+    return (128*128*3) // compression_ratio
+
+
+def get_linear_layer(latent_dim, output_dim=8192):
+    torch.manual_seed(0)
+    np.random.seed(0)
+    return torch.nn.Linear(latent_dim, output_dim).to(DEVICE)
+
+
 def write_ganz(output_filename, z, psnr, gen_ckpt):
     info_json = { 'gen_ckpt_name': gen_ckpt, 
                   'sha1sum': sha1sum(gen_ckpt),
-                  'PSNR': psnr }
+                  'PSNR': psnr}
     _write_ganz(output_filename, z, info_json)
     return
 
@@ -98,8 +102,10 @@ def write_ganz(output_filename, z, psnr, gen_ckpt):
 def _write_ganz(output_filename, z, info_json):
     os.makedirs(output_filename)
     # Save latent vector
-    with gzip.open(os.path.join(output_filename, LATENT_VECTOR_FILENAME), 'wb') as z_handle:
-        z_handle.write(z)
+
+    with gzip.GzipFile(os.path.join(output_filename, LATENT_VECTOR_FILENAME), 'wb') as z_handle:
+        print(f'DURING WRITE: z.shape: {z.shape}')
+        torch.save(z.detach(), z_handle)
 
     # Save info JSON
     with open(os.path.join(output_filename, INFO_JSON_FILENAME), 'w') as json_handle:
@@ -113,10 +119,15 @@ def uncompress(input_filename, output_filename=None, gen_ckpt=DEFAULT_GEN_CKPT):
     if sha1sum(gen_ckpt) != info_json['sha1sum']:
         raise ValueError('Generator Checkpoints do not match - cannot uncompress!')
 
+    latent_dim = z.shape[0]
+    print(f'during uncompress, latent_dim {latent_dim}')
+    linear_layer = get_linear_layer(latent_dim)
+
     g = load_trained_generator(DEFAULT_GEN_CLASS, gen_ckpt, latent_dim=GEN_LATENT_DIM, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups).to(DEVICE)
     g.eval()
 
-    x_hat = g(z)
+    model_input = linear_layer(z)
+    x_hat = g(model_input, skip_linear_layer=True)
     if output_filename is not None:
         save_image(x_hat, output_filename)
     
@@ -125,8 +136,9 @@ def uncompress(input_filename, output_filename=None, gen_ckpt=DEFAULT_GEN_CKPT):
 
 def read_ganz(input_filename):
     # Read latent vector
-    with gzip.open(os.path.join(input_filename, LATENT_VECTOR_FILENAME), 'rb') as f:
-        z = f.read()
+    with gzip.GzipFile(os.path.join(input_filename, LATENT_VECTOR_FILENAME), 'rb') as f:
+        z = torch.load(f)
+        print(f'DURING WRITE: z.shape: {z.shape}')
 
     # Read info JSON
     with open(os.path.join(input_filename, INFO_JSON_FILENAME), 'r') as f:
@@ -150,22 +162,21 @@ def sha1sum(gen_ckpt):
 
 
 class TestGANZ(unittest.TestCase):
-    def test_compress_toFile(self):
+    def test_all(self):
         img = './images/bananas.jpg'
 
         output_filename = './images/bananas.ganz'
         if os.path.exists(output_filename):
             shutil.rmtree(output_filename)
-        compress(img, 10, output_filename, n_steps=1000)
+        x_hat, z, psnr = compress(img, 10, output_filename)
+        #self.assertTrue(psnr > 25)
 
-    def test_compress_noFile(self):
-        img = './images/bananas.jpg'
-        x_hat, z, psnr = compress(img, 10, n_steps=1000)
-        print(psnr)
-        self.assertTrue(psnr > 50)
+        result_filename = './images/degraded_bananas.jpg'
+        if os.path.exists(result_filename):
+            os.remove(result_filename)
 
-    def test_uncompress(self):
-        raise NotImplementedError()
+        uncompress(output_filename, result_filename)
+
 
 if __name__ == '__main__':
     unittest.main()

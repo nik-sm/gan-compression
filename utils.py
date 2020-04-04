@@ -151,10 +151,18 @@ def load_target_image(filename):
         x = torch.load(filename)
     else:
         image = Image.open(filename)
+        height, width = image.size
+
+        if height > width:
+            crop = transforms.CenterCrop((width, width))
+        else:
+            crop = transforms.CenterCrop((height, height))
+
         t = transforms.Compose([
             # TODO - ideal is:
             # - if img rectangular, cut into square
             # - then resize to (P.size, P.size)
+            crop,
             transforms.Resize((P.size, P.size)),
             transforms.ToTensor()
         ])
@@ -168,6 +176,6 @@ def psnr(img1, img2):
         raise ValueError("how do we handle a perfect reconstruction?")
     pixel_max = torch.tensor(1.0)
     p = 20 * torch.log10(pixel_max) - 10 * torch.log10(mse)
-    if isinstance(p.torch.Tensor):
+    if isinstance(p, torch.Tensor):
         p = p.item()
     return p

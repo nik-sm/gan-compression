@@ -14,21 +14,27 @@ from utils import save_img_tensorboard, load_trained_generator, load_target_imag
 
 
 def output_to_imshow(v):
-    return v.squeeze(0).detach().to('cpu').numpy().transpose(1,2,0)
+    return v.squeeze(0).detach().to('cpu').numpy().transpose(1, 2, 0)
 
 
 def main(args):
     logdir = f'tensorboard_logs/search/{args.run_name}'
-    os.makedirs(logdir, exist_ok=True) # TODO - decide whether to clobber or what?
+    os.makedirs(logdir,
+                exist_ok=True)  # TODO - decide whether to clobber or what?
 
     writer = SummaryWriter(logdir)
 
-    device='cuda:0' 
+    device = 'cuda:0'
 
     x = load_target_image(args.image).to(device)
     save_img_tensorboard(x.squeeze(0).detach().cpu(), writer, f'original')
 
-    g = load_trained_generator(SizedGenerator, args.generator_checkpoint, latent_dim=64, num_filters=P.num_filters, image_size=P.size, num_ups=P.num_ups).to(device)
+    g = load_trained_generator(SizedGenerator,
+                               args.generator_checkpoint,
+                               latent_dim=64,
+                               num_filters=P.num_filters,
+                               image_size=P.size,
+                               num_ups=P.num_ups).to(device)
     g.eval()
 
     if args.latent_dim != g.latent_dim:
@@ -53,7 +59,8 @@ def main(args):
         # - std=1.0 better than std=0.1 or std=0.01
         # - uniform and normal performed nearly identical
         if args.initialization == 'uniform':
-            z = (2 * args.std) * torch.rand(args.latent_dim, device=device) - args.std
+            z = (2 * args.std) * torch.rand(args.latent_dim,
+                                            device=device) - args.std
         elif args.initialization == 'normal':
             z = torch.randn(args.latent_dim, device=device) * args.std
         elif args.initialization == 'ones':
@@ -68,16 +75,21 @@ def main(args):
 
         z_initial = z.data.clone()
         optimizer = torch.optim.Adam([z], lr=0.05, betas=(0.5, 0.999))
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.n_steps)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, args.n_steps)
 
         with torch.no_grad():
             model_input = linear_layer(z_initial)
-            save_img_tensorboard(g(model_input, skip_linear_layer=args.skip_linear_layer).squeeze(0).detach().cpu(), writer, f'restart_{i}/beginning')
+            save_img_tensorboard(
+                g(model_input,
+                  skip_linear_layer=args.skip_linear_layer).squeeze(
+                      0).detach().cpu(), writer, f'restart_{i}/beginning')
 
         for j in trange(args.n_steps, leave=False):
             optimizer.zero_grad()
             model_input = linear_layer(z)
-            x_hat = g(model_input, skip_linear_layer=args.skip_linear_layer).squeeze(0)
+            x_hat = g(model_input,
+                      skip_linear_layer=args.skip_linear_layer).squeeze(0)
             mse = F.mse_loss(x_hat, x)
             mse.backward()
             optimizer.step()
@@ -87,10 +99,14 @@ def main(args):
             writer.add_scalar(f'PSNR/{i}', psnr(x, x_hat), j)
 
             if j % save_every_n == 0:
-                save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/reconstruction', j)
+                save_img_tensorboard(
+                    x_hat.squeeze(0).detach().cpu(), writer,
+                    f'restart_{i}/reconstruction', j)
 
-        save_img_tensorboard(x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/final')
-        save_image(make_grid([x, x_hat.squeeze(0)], nrow=2), f'{args.run_name}.png')
+        save_img_tensorboard(
+            x_hat.squeeze(0).detach().cpu(), writer, f'restart_{i}/final')
+        save_image(make_grid([x, x_hat.squeeze(0)], nrow=2),
+                   f'{args.run_name}.png')
 
 
 def get_latent_dims(x):
@@ -102,16 +118,27 @@ def get_latent_dims(x):
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('--generator_checkpoint', default='./checkpoints/celeba_cropped/gen_ckpt.49.pt', help="Path to generator checkpoint")
+    p.add_argument('--generator_checkpoint',
+                   default='./checkpoints/celeba_cropped/gen_ckpt.49.pt',
+                   help="Path to generator checkpoint")
     p.add_argument('--image', required=True)
     p.add_argument('--run_name', default=datetime.now().isoformat())
     p.add_argument('--n_restarts', type=int, default=3)
     p.add_argument('--n_steps', type=int, default=3000)
-    p.add_argument('--initialization', choices=['uniform', 'normal', 'ones'], default='normal')
-    p.add_argument('--std', type=float, default=1.0, help='for normal dist, the std. for uniform, the min and max val')
-    p.add_argument('--latent_dim', type=get_latent_dims, default=4096, help='int between [1, 8192]')
+    p.add_argument('--initialization',
+                   choices=['uniform', 'normal', 'ones'],
+                   default='normal')
+    p.add_argument(
+        '--std',
+        type=float,
+        default=1.0,
+        help='for normal dist, the std. for uniform, the min and max val')
+    p.add_argument('--latent_dim',
+                   type=get_latent_dims,
+                   default=4096,
+                   help='int between [1, 8192]')
     args = p.parse_args()
 
-    # TODO - if model used latent_dim=64 and you also wanan reconstruct from 64, 
+    # TODO - if model used latent_dim=64 and you also wanan reconstruct from 64,
     # does it hurt to just skip linear layer?
     main(args)

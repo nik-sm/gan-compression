@@ -84,7 +84,7 @@ def jpeg_compress(img, quality_layers, quality_mode='rates'):
     return Image.open(outputIoStream)
 
 
-def save_gif(gen_checkpoints, n_row=2, n_col=3, gen_class=SimpleGenerator):
+def save_gif(gen_checkpoints, output_filename, n_row=2, n_col=3, gen_class=SimpleGenerator):
     """
     TODO - work-in-progress
     Input:
@@ -102,10 +102,10 @@ def save_gif(gen_checkpoints, n_row=2, n_col=3, gen_class=SimpleGenerator):
     gen_args = []
     gen_kwargs = {}
     device = 'cuda:0'
-    output_dir = 'movies'
-    output_name = 'TEST.gif'
 
     # We need to select n_row * n_col points to track through time
+    torch.manual_seed(0)
+    np.random.seed(0)
     z = torch.randn(n_row * n_col, latent_dim, device=device)
     movie = []
 
@@ -132,8 +132,7 @@ def save_gif(gen_checkpoints, n_row=2, n_col=3, gen_class=SimpleGenerator):
 
     # Write the GIF
     fps = 2
-    filename = join(output_dir, output_name)
-    ImageSequenceClip(movie).write_gif(filename, fps=fps)
+    ImageSequenceClip(movie).write_gif(output_filename, fps=fps)
     return
 
 

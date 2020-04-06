@@ -1,4 +1,4 @@
-from os.path import join, splitext
+import os
 from utils import jpeg_compress, load_target_image, psnr, save_gif
 import torch
 from compress import compress
@@ -20,11 +20,13 @@ def make_gifs():
     dataset = 'celeba'
 
     for X in [64, 128, 512]:
-        gen_folder = join(folder, f'{dataset}_ELU_latent_dim_{X}')
+        gen_folder = os.path.join(folder, f'{dataset}_ELU_latent_dim_{X}')
 
-        checkpoints = [join(gen_folder, f'gen_ckpt.{i}.pt') for i in range(50)]
+        checkpoints = [
+            os.path.join(gen_folder, f'gen_ckpt.{i}.pt') for i in range(50)
+        ]
 
-        save_gif(X, checkpoints, f'latent_dim_{X}.gif')
+        save_gif(X, checkpoints, f'./figures/latent_dim_{X}.gif')
 
 
 def make_compression_series(img_fp, ratios=[5, 10, 15, 20]):
@@ -32,7 +34,8 @@ def make_compression_series(img_fp, ratios=[5, 10, 15, 20]):
 
     # Original image after transform (now size 128 x 128 x 3)
     transformed_img = Image.fromarray((orig_img * 255).astype(np.uint8))
-    p, ext = splitext(img_fp)
+    p, ext = os.path.splitext(img_fp)
+    bn = os.path.basename(p)
     transformed_img_fp = f'{p}_transformed{ext}'
     transformed_img.save(transformed_img_fp)
 
@@ -73,8 +76,10 @@ def make_compression_series(img_fp, ratios=[5, 10, 15, 20]):
 
         axes[i, 0].set_ylabel(f'Ratio={c}')
 
-    fig.savefig("./images/out.png")
+    fig.savefig(f"./figures/{bn}.png")
 
 
 if __name__ == "__main__":
+    os.makedirs("./figures", exist_ok=True)
+    make_gifs()
     make_compression_series("./images/bananas.jpg")

@@ -5,7 +5,7 @@ from model import SimpleGenerator
 import numpy as np
 from os.path import join
 import params as P
-from PIL import Image
+from PIL import Image, ImageDraw
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
@@ -53,8 +53,8 @@ def load_trained_generator(generator_class, generator_checkpoint, *gen_args,
                            **gen_kwargs):
     gen = generator_class(*gen_args, **gen_kwargs)
     try:
-        ckpt = torch.load(generator_checkpoint, map_location='cpu')[
-            'model_state_dict']
+        ckpt = torch.load(generator_checkpoint,
+                          map_location='cpu')['model_state_dict']
         fixed_ckpt = {}
         for k, v in ckpt.items():
             if k.startswith('module.'):
@@ -64,8 +64,8 @@ def load_trained_generator(generator_class, generator_checkpoint, *gen_args,
         gen.load_state_dict(fixed_ckpt)
     except Exception as e:
         print(e)
-        gen.load_state_dict(torch.load(
-            generator_checkpoint, map_location='cpu'))
+        gen.load_state_dict(torch.load(generator_checkpoint,
+                                       map_location='cpu'))
 
     return gen
 
@@ -90,7 +90,12 @@ def jpeg_compress(img, quality_layers, quality_mode='rates'):
     return Image.open(outputIoStream)
 
 
-def save_gif(latent_dim, gen_checkpoints, output_filename, n_row=2, n_col=3, gen_class=SimpleGenerator):
+def save_gif(latent_dim,
+             gen_checkpoints,
+             output_filename,
+             n_row=2,
+             n_col=3,
+             gen_class=SimpleGenerator):
     """
     TODO - work-in-progress
     Input:
@@ -107,7 +112,7 @@ def save_gif(latent_dim, gen_checkpoints, output_filename, n_row=2, n_col=3, gen
     # TODO - settings
     gen_args = [latent_dim]
     gen_kwargs = {}
-    device = 'cuda:0'
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
     # We need to select n_row * n_col points to track through time
     torch.manual_seed(0)
@@ -116,29 +121,24 @@ def save_gif(latent_dim, gen_checkpoints, output_filename, n_row=2, n_col=3, gen
     movie = []
 
     # Generate the frames
-    for c in gen_checkpoints:
-        g = load_trained_generator(
-            gen_class, c, *gen_args, **gen_kwargs).to(device)
+    for i, c in enumerate(gen_checkpoints):
+        g = load_trained_generator(gen_class, c, *gen_args,
+                                   **gen_kwargs).to(device)
         g.eval()
 
         # Produce a batch of images, shape ((n_row * n_col) x H x W x Channel)
         batch = g(z).detach().to('cpu')
-        n_channels = batch.shape[1]
-        img_height = batch.shape[2]
-        img_width = batch.shape[3]
 
-        # Normalize each face in the frame separately
-        batch -= batch.view(n_row * n_col, -1).min(1).values[:, None, None,
-                                                             None]
-        batch /= batch.view(n_row * n_col, -1).max(1).values[:, None, None,
-                                                             None]
+        frame = (make_grid(batch, nrow=n_col, normalize=True,
+                           scale_each=True).numpy().transpose(
+                               (1, 2, 0)) * 255).astype(np.uint8)
+        img = Image.fromarray(frame)
+        draw = ImageDraw.Draw(img)
+        draw.text((2, n_row * 128 - 10),
+                  f'{0.19247 * (i+1):.1f}M images shown',
+                  fill=(0, 0, 0, 255))
 
-        # Reshape the batch, stacking the individual faces around into a grid of shape
-        # n_row by n_col
-        frame = np.transpose(batch.numpy(), [0, 2, 3, 1]).reshape(n_row * img_height, n_col * img_width,
-                                                                  n_channels)
-
-        movie.append(frame)
+        movie.append(np.asarray(img))
 
     # Write the GIF
     fps = 2

@@ -1,19 +1,14 @@
 import os
-from utils import jpeg_compress, load_target_image, psnr, save_gif
+from utils import load_target_image, psnr, save_gif
 import torch
 from compress import compress
 import matplotlib.pyplot as plt
-from PIL import Image, ImageMath
+from PIL import Image
 import numpy as np
-"""
-1) make GIFs of training
-2) for each generator, make side-by-side columns 
-    at the top, the original image
-    below, on left: GANz. on right: JPEG
-    from top to bottom: decreasing quality/increasing compression ratio
+import math
 
-"""
-
+from wavelet import wavelet_threshold
+from compress import get_latent_dim
 
 def make_gifs():
     folder = 'checkpoints'
@@ -29,7 +24,7 @@ def make_gifs():
         save_gif(X, checkpoints, f'./figures/latent_dim_{X}.gif')
 
 
-def make_compression_series(img_fp, ratios=[5, 10, 15, 20]):
+def make_compression_series(img_fp, ratios=[20, 40, 60, 100, 1000]):
     orig_img = load_target_image(img_fp).numpy().transpose((1, 2, 0))
 
     # Original image after transform (now size 128 x 128 x 3)
@@ -49,37 +44,31 @@ def make_compression_series(img_fp, ratios=[5, 10, 15, 20]):
                                  'wspace': 0
                              })
 
-    # axes[0, 0].imshow(orig_img)
-    # axes[0, 0].set_title('Original')
-    # axes[0, 0].set_xticks([])
-    # axes[0, 0].set_yticks([])
-
-    ax[0].annotate()
-
-    for c, i in zip(ratios, range(len(ratios))):
+    for i, c, in enumerate(ratios):
         # GAN compression
-        x_hat, _, p = compress(transformed_img_fp, c, n_steps=1000)
+        x_hat, _, p = compress(transformed_img_fp, c, n_steps=1)
         gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
         axes[i, 0].imshow(gan_img)
         axes[i, 0].set_title(f'PSNR={p:.2f}dB')
         axes[i, 0].set_xticks([])
         axes[i, 0].set_yticks([])
 
-        # JPEG2000 Compression
-        jpeg_img = np.asarray(jpeg_compress(transformed_img_fp, [c],
-                                            'dB')) / 255.
-        axes[i, 1].imshow(jpeg_img)
-        p = psnr(torch.from_numpy(orig_img), torch.from_numpy(jpeg_img))
+        # Wavelet compression
+        wavelet_img = wavelet_threshold(np.array(transformed_img), c)
+        wavelet_img = wavelet_img / 255.
+        print(wavelet_img.min(), wavelet_img.max())
+        axes[i, 1].imshow(wavelet_img)
+        p = psnr(torch.from_numpy(np.array(transformed_img)), torch.from_numpy(wavelet_img))
         axes[i, 1].set_title(f'PSNR={p:.2f}dB')
         axes[i, 1].set_xticks([])
         axes[i, 1].set_yticks([])
-
         axes[i, 0].set_ylabel(f'Ratio={c}')
 
-    fig.savefig(f"./figures/{bn}.png")
+    plt.tight_layout()
+    fig.savefig(f"./figures/{bn}.compression_series.png")
 
 
 if __name__ == "__main__":
     os.makedirs("./figures", exist_ok=True)
-    make_gifs()
-    make_compression_series("./images/bananas.jpg")
+    #make_gifs()
+    make_compression_series("./images/monarch.png")

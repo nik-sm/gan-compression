@@ -25,7 +25,7 @@ def make_gifs():
         save_gif(X, checkpoints, f'./figures/latent_dim_{X}.gif')
 
 
-def make_compression_series(img_fp, ratios=[10, 50, 100, 500, 1000, 2000]):
+def make_compression_series(img_fp, ratios=[100, 500]):
     np_img = load_target_image(img_fp).numpy().transpose((1, 2, 0))
 
     transformed_img = Image.fromarray((np_img * 255).astype(np.uint8))
@@ -34,7 +34,7 @@ def make_compression_series(img_fp, ratios=[10, 50, 100, 500, 1000, 2000]):
     transformed_img_fp = f'{p}_transformed.png'
     transformed_img.save(transformed_img_fp)
 
-    fig, axes = plt.subplots(len(ratios),
+    fig, axes = plt.subplots(len(ratios)+1,
                              2,
                              figsize=(5, 17),
                              gridspec_kw={
@@ -65,6 +65,14 @@ def make_compression_series(img_fp, ratios=[10, 50, 100, 500, 1000, 2000]):
         axes[i, 1].set_xlabel(f'PSNR={psnr_wav:.2f}dB', fontsize=14)
         axes[i, 1].set_xticks([])
         axes[i, 1].set_yticks([])
+
+    x_hat, _, psnr_gan = compress(transformed_img_fp, c, skip_linear_layer=False, n_steps=20000)
+    gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
+    axes[-1, 0].imshow(gan_img)
+    axes[-1, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
+    axes[-1, 0].set_ylabel('Keep linear', fontsize=16)
+    axes[-1, 0].set_xticks([])
+    axes[-1, 0].set_yticks([])
 
     fig.savefig(f"./figures/{bn}.compression_series.png")
 

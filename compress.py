@@ -41,6 +41,7 @@ GEN_LATENT_DIM = 64  # TODO - in order to load, need to match whatever latent di
 
 def compress(img,
              compression_ratio,
+             skip_linear_layer=True,
              output_filename=None,
              n_steps=5000,
              gen_ckpt=DEFAULT_GEN_CKPT):
@@ -61,21 +62,28 @@ def compress(img,
                                latent_dim=GEN_LATENT_DIM).to(DEVICE)
     g.eval()
 
-    latent_dim = get_latent_dim(compression_ratio)
+    if skip_linear_layer:
+        latent_dim = get_latent_dim(compression_ratio)
+    else:
+        latent_dim = g.latent_dim
     linear_layer = get_linear_layer(latent_dim)
 
     z = torch.randn(latent_dim, device=DEVICE)
     z = torch.nn.Parameter(torch.clamp(z, -1, 1))
 
     # lr = 0.3/compression_ratio
-    lr = 0.002
+    lr = 0.01
     optimizer = torch.optim.Adam([z], lr=lr, betas=(0.5, 0.999))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_steps)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_steps)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.95)
 
     for j in trange(n_steps, leave=False):
         optimizer.zero_grad()
-        model_input = linear_layer(z)
-        x_hat = g(model_input, skip_linear_layer=True).squeeze(0)
+        if skip_linear_layer:
+            model_input = linear_layer(z)
+            x_hat = g(model_input, skip_linear_layer=True).squeeze(0)
+        else:
+            x_hat = g(z, skip_linear_layer=False).squeeze(0)
         mse = F.mse_loss(x_hat, x)
         mse.backward()
         optimizer.step()

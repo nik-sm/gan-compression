@@ -67,7 +67,9 @@ def compress(img,
     z = torch.randn(latent_dim, device=DEVICE)
     z = torch.nn.Parameter(torch.clamp(z, -1, 1))
 
-    optimizer = torch.optim.Adam([z], lr=0.05, betas=(0.5, 0.999))
+    # lr = 0.3/compression_ratio
+    lr = 0.002
+    optimizer = torch.optim.Adam([z], lr=lr, betas=(0.5, 0.999))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_steps)
 
     for j in trange(n_steps, leave=False):

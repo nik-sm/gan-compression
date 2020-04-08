@@ -25,52 +25,74 @@ def make_gifs():
         save_gif(X, checkpoints, f'./figures/latent_dim_{X}.gif')
 
 
-def make_compression_series(img_fp, ratios=[20, 40, 60, 100, 1000]):
-    orig_img = load_target_image(img_fp).numpy().transpose((1, 2, 0))
+def make_compression_series(img_fp, ratios=[10, 50, 100, 500, 1000, 2000]):
+    np_img = load_target_image(img_fp).numpy().transpose((1, 2, 0))
 
-    # Original image after transform (now size 128 x 128 x 3)
-    transformed_img = Image.fromarray((orig_img * 255).astype(np.uint8))
+    transformed_img = Image.fromarray((np_img * 255).astype(np.uint8))
     p, ext = os.path.splitext(img_fp)
     bn = os.path.basename(p)
-    transformed_img_fp = f'{p}_transformed{ext}'
+    transformed_img_fp = f'{p}_transformed.png'
     transformed_img.save(transformed_img_fp)
 
     fig, axes = plt.subplots(len(ratios),
                              2,
-                             figsize=(12, 6),
-                             sharex=True,
-                             sharey=True,
+                             figsize=(5, 17),
                              gridspec_kw={
-                                 'hspace': 0,
-                                 'wspace': 0
+                                 'wspace': 0,
+                                 'hspace': 0.13
                              })
+    plt.tight_layout()
+
+    # Set title
+    axes[0, 0].set_title('GAN', fontsize=18)
+    axes[0, 1].set_title('Wavelet', fontsize=18)
 
     for i, c, in enumerate(ratios):
         # GAN compression
-        x_hat, _, p = compress(transformed_img_fp, c, n_steps=1)
+        x_hat, _, psnr_gan = compress(transformed_img_fp, c, n_steps=20000)
         gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
         axes[i, 0].imshow(gan_img)
-        axes[i, 0].set_title(f'PSNR={p:.2f}dB')
+        axes[i, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
         axes[i, 0].set_xticks([])
         axes[i, 0].set_yticks([])
 
+        axes[i, 0].set_ylabel(f'Ratio={c}', fontsize=16)
+
         # Wavelet compression
-        wavelet_img = wavelet_threshold(np.array(transformed_img), c)
-        wavelet_img = wavelet_img / 255.
-        print(wavelet_img.min(), wavelet_img.max())
+        wavelet_img = wavelet_threshold(np_img, c)
         axes[i, 1].imshow(wavelet_img)
-        p = psnr(torch.from_numpy(np.array(transformed_img)),
-                 torch.from_numpy(wavelet_img))
-        axes[i, 1].set_title(f'PSNR={p:.2f}dB')
+        psnr_wav = psnr(torch.from_numpy(np_img), torch.from_numpy(wavelet_img))
+        axes[i, 1].set_xlabel(f'PSNR={psnr_wav:.2f}dB', fontsize=14)
         axes[i, 1].set_xticks([])
         axes[i, 1].set_yticks([])
-        axes[i, 0].set_ylabel(f'Ratio={c}')
 
-    plt.tight_layout()
     fig.savefig(f"./figures/{bn}.compression_series.png")
 
 
 if __name__ == "__main__":
     os.makedirs("./figures", exist_ok=True)
-    make_gifs()
+    # Make gifs for different latent dims
+    # make_gifs()
+
+    # Celeba Train
+    make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
+
+    # Celeba Test
+    # make_compression_series("./dataset/celeba_preprocessed/test/193124.pt")
+    # make_compression_series("./dataset/celeba_preprocessed/test/196479.pt")
+    # make_compression_series("./dataset/celeba_preprocessed/test/197511.pt")
+
+    # # FFHQ Test
+    # make_compression_series("./dataset/ffhq_preprocessed/test/17205.pt")
+    # make_compression_series("./dataset/ffhq_preprocessed/test/41272.pt")
+    # make_compression_series("./dataset/ffhq_preprocessed/test/61998.pt")
+
+    # # Random
+    # make_compression_series("./images/astronaut.png")
+    # make_compression_series("./images/bananas.jpg")
+    # make_compression_series("./images/jack.jpg")
+    # make_compression_series("./images/lena.png")
     # make_compression_series("./images/monarch.png")
+    # make_compression_series("./images/night.jpg")
+    # make_compression_series("./images/ocean.jpg")
+

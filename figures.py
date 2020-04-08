@@ -25,7 +25,12 @@ def make_gifs():
         save_gif(X, checkpoints, f'./figures/latent_dim_{X}.gif')
 
 
-def make_compression_series(img_fp, ratios=[100, 500]):
+def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
+    # TODO - we can add one more target ratio,
+    # e.g. for GAN64 it would be 768, for GAN128 it would be 384, etc
+    # This means we would be making these series for various gans,
+    # and compress() needs to take an argument specifying which one
+    # (so that we can tell out here what the gen.latent_dim is)
     np_img = load_target_image(img_fp).numpy().transpose((1, 2, 0))
 
     transformed_img = Image.fromarray((np_img * 255).astype(np.uint8))
@@ -40,16 +45,31 @@ def make_compression_series(img_fp, ratios=[100, 500]):
                              gridspec_kw={
                                  'wspace': 0,
                                  'hspace': 0.13
-                             })
-    plt.tight_layout()
+                             },
+                             constrained_layout=True)
 
-    # Set title
-    axes[0, 0].set_title('GAN', fontsize=18)
-    axes[0, 1].set_title('Wavelet', fontsize=18)
+    # Show original image and keep_linear version
+    axes[0, 0].set_title('Original', fontsize=18)
+    axes[0, 1].set_title('Keep_Linear', fontsize=18)
 
+    axes[0, 0].imshow(np_img)
+    axes[0, 0].set_xticks([])
+    axes[0, 0].set_yticks([])
+
+    x_hat, _, psnr_gan = compress(transformed_img_fp, skip_linear_layer=False, n_steps=5000)
+    gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
+    axes[0, 1].imshow(gan_img)
+    axes[0, 1].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
+    axes[0, 1].set_xticks([])
+    axes[0, 1].set_yticks([])
+
+    # Show varying compression ratios
+    axes[1, 0].set_title('GAN', fontsize=18)
+    axes[1, 1].set_title('Wavelet', fontsize=18)
     for i, c, in enumerate(ratios):
+        i += 1 # offset by 1
         # GAN compression
-        x_hat, _, psnr_gan = compress(transformed_img_fp, c, n_steps=20000)
+        x_hat, _, psnr_gan = compress(transformed_img_fp, c, n_steps=5000)
         gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
         axes[i, 0].imshow(gan_img)
         axes[i, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
@@ -66,15 +86,28 @@ def make_compression_series(img_fp, ratios=[100, 500]):
         axes[i, 1].set_xticks([])
         axes[i, 1].set_yticks([])
 
-    x_hat, _, psnr_gan = compress(transformed_img_fp, c, skip_linear_layer=False, n_steps=20000)
-    gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
-    axes[-1, 0].imshow(gan_img)
-    axes[-1, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
-    axes[-1, 0].set_ylabel('Keep linear', fontsize=16)
-    axes[-1, 0].set_xticks([])
-    axes[-1, 0].set_yticks([])
-
     fig.savefig(f"./figures/{bn}.compression_series.png")
+
+
+def make_psnr_scatterplot():
+    """
+    For a list of images, compute the PSNR from GANZ and from Wavelets,
+    and use these as the X,Y coords in a scatterplot
+
+    images = []
+    p_ganz = []
+    p_wave = []
+    for image in images:
+        p_ganz.append(...)
+        p_wave.append(...)
+
+    plt.scatter(p_ganz, p_wave)
+    plt.set_title('PSNR
+    """
+    pass
+
+
+
 
 
 if __name__ == "__main__":
@@ -83,7 +116,7 @@ if __name__ == "__main__":
     # make_gifs()
 
     # Celeba Train
-    make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
+    #make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
 
     # Celeba Test
     # make_compression_series("./dataset/celeba_preprocessed/test/193124.pt")
@@ -98,7 +131,7 @@ if __name__ == "__main__":
     # # Random
     # make_compression_series("./images/astronaut.png")
     # make_compression_series("./images/bananas.jpg")
-    # make_compression_series("./images/jack.jpg")
+    make_compression_series("./images/jack.jpg")
     # make_compression_series("./images/lena.png")
     # make_compression_series("./images/monarch.png")
     # make_compression_series("./images/night.jpg")

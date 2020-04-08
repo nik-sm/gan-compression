@@ -12,6 +12,7 @@ Compressed file format:
                   "checksum" : "...",
                   "PSNR" : ... }
 """
+import math
 import shutil
 import hashlib
 import gzip
@@ -40,9 +41,10 @@ GEN_LATENT_DIM = 64  # TODO - in order to load, need to match whatever latent di
 
 
 def compress(img,
-             compression_ratio,
+             compression_ratio=None,
              skip_linear_layer=True,
              output_filename=None,
+             compressive_sensing=False,
              n_steps=5000,
              gen_ckpt=DEFAULT_GEN_CKPT):
     """
@@ -73,9 +75,15 @@ def compress(img,
 
     # lr = 0.3/compression_ratio
     lr = 0.01
+    target_lr_fraction = 0.01 # end at X% of starting LR
+    gamma = 2 ** (math.log2(target_lr_fraction) / n_steps)
     optimizer = torch.optim.Adam([z], lr=lr, betas=(0.5, 0.999))
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_steps)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.95)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
+
+    if compressive_sensing:
+        n_measurements = 5000
+        A = torch.randn(n_measurements, np.prod(x.shape), device=DEVICE) / math.sqrt(n_measurements)
 
     for j in trange(n_steps, leave=False):
         optimizer.zero_grad()
@@ -84,7 +92,12 @@ def compress(img,
             x_hat = g(model_input, skip_linear_layer=True).squeeze(0)
         else:
             x_hat = g(z, skip_linear_layer=False).squeeze(0)
-        mse = F.mse_loss(x_hat, x)
+
+        if compressive_sensing:
+            mse = F.mse_loss(A @ x_hat.view(-1), A @ x.view(-1))
+        else:
+            mse = F.mse_loss(x_hat, x)
+
         mse.backward()
         optimizer.step()
         scheduler.step()

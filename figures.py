@@ -10,6 +10,7 @@ import math
 from wavelet import wavelet_threshold
 from compress import get_latent_dim
 
+
 def make_gifs():
     folder = 'checkpoints'
     dataset = 'celeba'
@@ -58,7 +59,8 @@ def make_compression_series(img_fp, ratios=[20, 40, 60, 100, 1000]):
         wavelet_img = wavelet_img / 255.
         print(wavelet_img.min(), wavelet_img.max())
         axes[i, 1].imshow(wavelet_img)
-        p = psnr(torch.from_numpy(np.array(transformed_img)), torch.from_numpy(wavelet_img))
+        p = psnr(torch.from_numpy(np.array(transformed_img)),
+                 torch.from_numpy(wavelet_img))
         axes[i, 1].set_title(f'PSNR={p:.2f}dB')
         axes[i, 1].set_xticks([])
         axes[i, 1].set_yticks([])
@@ -70,5 +72,5 @@ def make_compression_series(img_fp, ratios=[20, 40, 60, 100, 1000]):
 
 if __name__ == "__main__":
     os.makedirs("./figures", exist_ok=True)
-    #make_gifs()
-    make_compression_series("./images/monarch.png")
+    make_gifs()
+    # make_compression_series("./images/monarch.png")

@@ -134,15 +134,15 @@ def save_gif(latent_dim,
                                (1, 2, 0)) * 255).astype(np.uint8)
         img = Image.fromarray(frame)
         draw = ImageDraw.Draw(img)
-        draw.text((2, n_row * 128 - 10),
+        draw.text((5, n_row * 128 - 10),
                   f'{0.19247 * (i+1):.1f}M images shown',
-                  fill=(0, 0, 0, 255))
-
+                  fill=(77, 5, 232, 255))
         movie.append(np.asarray(img))
 
     # Write the GIF
     fps = 2
-    ImageSequenceClip(movie, fps=fps).write_gif(output_filename, fps=fps)
+    clip = ImageSequenceClip(movie, fps=fps).resize(2)
+    clip.write_gif(output_filename, fps=fps)
     return
 
 

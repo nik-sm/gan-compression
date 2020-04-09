@@ -46,7 +46,8 @@ def compress(img,
              output_filename=None,
              compressive_sensing=False,
              n_steps=5000,
-             gen_ckpt=DEFAULT_GEN_CKPT):
+             gen_ckpt=DEFAULT_GEN_CKPT,
+             latent_dim=GEN_LATENT_DIM):
     """
     Args:
         img - filename of image to be compressed. Must be 128x128x3 pixels
@@ -62,12 +63,13 @@ def compress(img,
         img = load_target_image(img)
     else:
         if not isinstance(img, torch.Tensor):
-            raise ValueError("Must provide filename or preprocessed torch.Tensor!")
+            raise ValueError(
+                "Must provide filename or preprocessed torch.Tensor!")
 
     x = img.to(DEVICE)
     g = load_trained_generator(DEFAULT_GEN_CLASS,
                                gen_ckpt,
-                               latent_dim=GEN_LATENT_DIM).to(DEVICE)
+                               latent_dim=latent_dim).to(DEVICE)
     g.eval()
 
     if skip_linear_layer:
@@ -81,15 +83,16 @@ def compress(img,
 
     # lr = 0.3/compression_ratio
     lr = 0.01
-    target_lr_fraction = 0.01 # end at X% of starting LR
-    gamma = 2 ** (math.log2(target_lr_fraction) / n_steps)
+    #  target_lr_fraction = 0.01  # end at X% of starting LR
+    # gamma = 2**(math.log2(target_lr_fraction) / n_steps)
     optimizer = torch.optim.Adam([z], lr=lr, betas=(0.5, 0.999))
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_steps)
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_steps)
+    # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
 
     if compressive_sensing:
         n_measurements = 5000
-        A = torch.randn(n_measurements, np.prod(x.shape), device=DEVICE) / math.sqrt(n_measurements)
+        A = torch.randn(n_measurements, np.prod(x.shape),
+                        device=DEVICE) / math.sqrt(n_measurements)
 
     for j in trange(n_steps, leave=False):
         optimizer.zero_grad()
@@ -217,22 +220,23 @@ def get_size(start_path):
             total_size += get_size(os.path.join(dirpath, d))
         for f in filenames:
             fp = os.path.join(dirpath, f)
-            if not os.path.islink(fp): # skip links
+            if not os.path.islink(fp):  # skip links
                 total_size += os.path.getsize(fp)
     return total_size
 
 
 class TestGANZ(unittest.TestCase):
+
     def test_all(self):
         img = './images/bananas.jpg'
 
         output_filename = './images/bananas.ganz'
         if os.path.exists(output_filename):
             shutil.rmtree(output_filename)
-        x_hat, z, psnr = compress(img, 
-                compression_ratio=10, 
-                output_filename=output_filename, 
-                n_steps=5000)
+        x_hat, z, psnr = compress(img,
+                                  compression_ratio=10,
+                                  output_filename=output_filename,
+                                  n_steps=5000)
         self.assertTrue(psnr > 25)
 
         result_filename = './images/degraded_bananas.jpg'

@@ -35,11 +35,11 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     # (so that we can tell out here what the gen.latent_dim is)
     bn, _ = os.path.splitext(os.path.basename(img_fp))
 
-    CS = True # compressive sensing?
+    CS = True  # compressive sensing?
     torch_img = load_target_image(img_fp)
     np_img = torch_img.numpy().transpose((1, 2, 0))
 
-    fig, axes = plt.subplots(len(ratios)+1,
+    fig, axes = plt.subplots(len(ratios) + 1,
                              2,
                              figsize=(5, 17),
                              gridspec_kw={
@@ -56,8 +56,10 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     axes[0, 0].set_xticks([])
     axes[0, 0].set_yticks([])
 
-    x_hat, _, psnr_gan = compress(torch_img, skip_linear_layer=False, 
-            compressive_sensing=CS, n_steps=5)
+    x_hat, _, psnr_gan = compress(torch_img,
+                                  skip_linear_layer=False,
+                                  compressive_sensing=CS,
+                                  n_steps=5)
     gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
     axes[0, 1].imshow(gan_img)
     axes[0, 1].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
@@ -68,9 +70,12 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     axes[1, 0].set_title('GAN', fontsize=18)
     axes[1, 1].set_title('Wavelet', fontsize=18)
     for i, c, in enumerate(ratios):
-        i += 1 # offset by 1
+        i += 1  # offset by 1
         # GAN compression
-        x_hat, _, psnr_gan = compress(torch_img, c, compressive_sensing=CS, n_steps=5)
+        x_hat, _, psnr_gan = compress(torch_img,
+                                      c,
+                                      compressive_sensing=CS,
+                                      n_steps=5)
         gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
         axes[i, 0].imshow(gan_img)
         axes[i, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
@@ -102,44 +107,49 @@ def make_psnr_scatterplot():
     - 4 generator checkpoints
     - 2 target compression ratios
     """
-
-
-    
-    n_imgs = 2
-    imgs_train = sorted(pathlib.Path('./data/celeba_preprocessed-v2/train').rglob('*'))[:n_imgs]
-    imgs_test = sorted(pathlib.Path('./data/celeba_preprocessed-v2/test').rglob('*'))[:n_imgs]
-    imgs_extra = sorted(pathlib.Path('./images/out_of_domain/').rglob('*'))[:n_imgs]
+    n_imgs = 20
+    imgs_train = sorted(
+        pathlib.Path('./dataset/celeba_preprocessed/train').rglob('*'))[:n_imgs]
+    imgs_test = sorted(
+        pathlib.Path('./dataset/celeba_preprocessed/test').rglob('*'))[:n_imgs]
+    imgs_extra = sorted(
+        pathlib.Path('./images/out_of_domain/').rglob('*'))[:n_imgs]
 
     imgs_train = [str(x) for x in imgs_train]
     imgs_test = [str(x) for x in imgs_test]
     imgs_extra = [str(x) for x in imgs_extra]
 
-    gen_ckpts = {'./checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('c', 64),
-                 './checkpoints/celeba_ELU_latent_dim_128/gen_ckpt.49.pt': ('y', 128),
-                 './checkpoints/celeba_ELU_latent_dim_256/gen_ckpt.49.pt': ('g', 256),
-                 './checkpoints/celeba_ELU_latent_dim_512/gen_ckpt.49.pt': ('r', 512)}
+    gen_ckpts = {
+        './checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('c', 64),
+        './checkpoints/celeba_ELU_latent_dim_128/gen_ckpt.49.pt': ('y', 128),
+        './checkpoints/celeba_ELU_latent_dim_256/gen_ckpt.49.pt': ('g', 256),
+        './checkpoints/celeba_ELU_latent_dim_512/gen_ckpt.49.pt': ('r', 512)
+    }
 
     # TODO - Review chosen settings before launch
-    cratios = {5: 'x', 20: 'o'} 
+    cratios = {10: 'x', 30: 'o'}
 
     _scatter(gen_ckpts, cratios, imgs_train, 'CelebA_Train')
     _scatter(gen_ckpts, cratios, imgs_test, 'CelebA_Test')
-    _scatter(gen_ckpts, cratios, imgs_extra, 'Out-of-Domain')
+    # _scatter(gen_ckpts, cratios, imgs_extra, 'Out-of-Domain')
     return
+
 
 def _scatter(gen_ckpts, cratios, imgs, title):
     compressive_sensing = False
 
-    fig, ax = plt.subplots(1, 1, figsize=(9,9), constrained_layout=True)
+    fig, ax = plt.subplots(1, 1, figsize=(9, 9), constrained_layout=True)
     ax.set_title(f'PSNR on: {title}')
     ax.set_ylabel('GANZ')
     ax.set_xlabel('Wavelet')
 
-    lims = [10,50] # TODO - Check that this is a safe lower bound, or set empirically
+    lims = [0, 50
+           ]  # TODO - Check that this is a safe lower bound, or set empirically
     ax.set_xlim(lims)
     ax.set_ylim(lims)
 
-    ax.plot(lims, lims, 'k--', alpha=0.3, zorder=0)
+    ax.plot(lims, lims, 'k--', alpha=0.3)
+    # ax.plot(ax.get_xlim(), ax.get_ylim(), 'k--', alpha=0.3)
 
     for g, (color, latent_dim) in gen_ckpts.items():
         for cratio, marker in cratios.items():
@@ -149,21 +159,28 @@ def _scatter(gen_ckpts, cratios, imgs, title):
                 # Find PSNR from GANZ compression
                 torch_img = load_target_image(img)
                 _, _, p_gan = compress(torch_img,
-                        compression_ratio=cratio,
-                        skip_linear_layer=True, 
-                        compressive_sensing=compressive_sensing, 
-                        n_steps=2) # TODO - 
+                                       compression_ratio=cratio,
+                                       skip_linear_layer=True,
+                                       compressive_sensing=compressive_sensing,
+                                       n_steps=7500,
+                                       gen_ckpt=g,
+                                       latent_dim=latent_dim)  # TODO -
                 psnr_ganz.append(p_gan)
 
                 # Find PSNR from Wavelet compression
                 np_img = torch_img.numpy().transpose((1, 2, 0))
                 wavelet_img = wavelet_threshold(np_img, cratio)
-                p_wav = psnr(torch.from_numpy(np_img), torch.from_numpy(wavelet_img))
+                p_wav = psnr(torch.from_numpy(np_img),
+                             torch.from_numpy(wavelet_img))
                 psnr_wave.append(p_wav)
-            ax.scatter(psnr_wave, psnr_ganz, c=color, marker=marker, alpha=0.5, 
-                    label=f'CR={cratio},training_dim={latent_dim}')
+            ax.scatter(psnr_wave,
+                       psnr_ganz,
+                       c=color,
+                       marker=marker,
+                       alpha=0.5,
+                       label=f'CR={cratio},training_dim={latent_dim}')
 
-    fig.legend()
+    ax.legend(loc='upper_left')
     plt.savefig(f'./figures/psnr_scatterplot.{title}.png')
     return
 
@@ -196,4 +213,3 @@ if __name__ == "__main__":
     # make_compression_series("./images/ocean.jpg")
 
     make_psnr_scatterplot()
-

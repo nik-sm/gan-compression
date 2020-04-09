@@ -49,6 +49,8 @@ def idwt2(Wim):
 
 def wavelet_threshold(image, compression_ratio):
     compression_ratio = max(1, compression_ratio // 3)
+    if compression_ratio == 1:
+        raise ValueError('compression_ratio must be >= 6')
     result = np.zeros(image.shape, dtype=np.float32)
     for c in range(3):
         im = image[:, :, c]
@@ -60,7 +62,7 @@ def wavelet_threshold(image, compression_ratio):
 def wavelet_threshold_single_channel(image, compression_ratio):
     Wim = dwt2(image)
     m = np.sort(abs(Wim.ravel()))[::-1]
-    if compression_ratio==1:
+    if compression_ratio == 1:
         ndx = len(m) - 1
     else:
         ndx = int(len(m) / compression_ratio)

@@ -70,26 +70,6 @@ def load_trained_generator(generator_class, generator_checkpoint, *gen_args,
     return gen
 
 
-def jpeg_compress(img, quality_layers, quality_mode='rates'):
-    """
-        quality_mode: 'rates' - compression ratio. 'dB' - SNR value in decibels
-
-    Example usage:
-        i = 'images/bananas.jpg'
-        results = jpeg_compress(i, [30], 'dB')
-        results.save('test.jpg')
-
-    """
-    img = Image.open(img)
-    outputIoStream = io.BytesIO()
-    img.save(outputIoStream,
-             "JPEG2000",
-             quality_mode=quality_mode,
-             quality_layers=quality_layers)
-    outputIoStream.seek(0)
-    return Image.open(outputIoStream)
-
-
 def save_gif(latent_dim,
              gen_checkpoints,
              output_filename,

@@ -90,7 +90,7 @@ if __name__ == '__main__':
         glob = '*.png'
 
     elif a.dataset == 'celeba':
-        # See README for notes on choosing crop location
+        # TODO - See README for notes on choosing crop location
         transform = transforms.Compose([
             transforms.Lambda(
                 lambda img: transforms.functional.crop(img, 51, 26, 128, 128)),

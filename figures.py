@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import math
+from tqdm import tqdm
 
 from wavelet import wavelet_threshold
 from compress import get_latent_dim
@@ -86,45 +87,54 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
         axes[i, 1].set_yticks([])
 
     fig.savefig(f"./figures/{bn}.compression_series.png")
+    return
 
 
-def make_psnr_scatterplot():
+def make_psnr_scatterplot(imgs_train, imgs_test, imgs_extra):
     """
     For a list of images, compute the PSNR from GANZ and from Wavelets,
     and use these as the X,Y coords in a scatterplot
     """
-    fig = plt.figure()
-    images_train = [] # CelebA Train
-    images_test = [] # CelebA Test
-    images_extra = [] # ImageNet selected images
+    fig, ax = plt.subplots(1, 1, figsize=(16,9), constrained_layout=True)
+    ax.set_title(f'PSNR')
+    ax.set_ylabel('GANZ')
+    ax.set_xlabel('Wavelet')
 
-    _make_scatter(fig, images_train, "Train")
-    _make_scatter(fig, images_test, "Test")
-    _make_scatter(fig, images_extra, "ImageNet")
+    _scatter(ax, imgs_train, 'CelebA_Train', 'r', '+')
+    _scatter(ax, imgs_test, 'CelebA_Test', 'g', 'd')
+    _scatter(ax, imgs_extra, 'ImageNet', 'b', 'o')
 
+    lims = [np.min([ax.get_xlim(), ax.get_ylim()]),
+            np.max([ax.get_xlim(), ax.get_ylim()])]
+    ax.plot(lims, lims, 'k--', alpha=0.3, zorder=0)
 
-def _make_scatter(fig, images, title):
-    p_ganz = []
-    p_wave = []
-    for image in images:
-
-        x_hat, _, psnr_gan = compress(transformed_img_fp, 
-                skip_linear_layer=False, 
-                compressive_sensing=CS, n_steps=5000)
-
-        p_ganz.append([])
-        p_wave.append([])
-
-    fig.scatter(p_ganz, p_wave)
-    fig.set_title(f'PSNR on: {10}')
-    fig.set_ylabel('GANZ')
-    fig.set_xlabel('Wavelet')
-    fig.plot(np.arange(len(p_ganz)))
+    fig.legend()
+    plt.savefig(f'./figures/psnr_scatterplot.png')
+    return
 
 
+def _scatter(ax, imgs, label, color, marker, compressive_sensing=False):
+    compression_ratio=20
+    psnr_ganz = []
+    psnr_wave = []
+    for img in tqdm(imgs):
+        # Find PSNR from GANZ compression
+        torch_img = load_target_image(img)
+        _, _, p_gan = compress(torch_img,
+                compression_ratio=compression_ratio,
+                skip_linear_layer=True, 
+                compressive_sensing=compressive_sensing, 
+                n_steps=5)
+        psnr_ganz.append(p_gan)
 
+        # Find PSNR from Wavelet compression
+        np_img = torch_img.numpy().transpose((1, 2, 0))
+        wavelet_img = wavelet_threshold(np_img, compression_ratio)
+        p_wav = psnr(torch.from_numpy(np_img), torch.from_numpy(wavelet_img))
+        psnr_wave.append(p_wav)
 
-
+    ax.scatter(psnr_wave, psnr_ganz, c=color, marker=marker, alpha=0.5, label=label)
+    return
 
 
 if __name__ == "__main__":
@@ -148,9 +158,20 @@ if __name__ == "__main__":
     # # Random
     # make_compression_series("./images/astronaut.png")
     # make_compression_series("./images/bananas.jpg")
-    make_compression_series("./images/jack.jpg")
+    # make_compression_series("./images/jack.jpg")
     # make_compression_series("./images/lena.png")
     # make_compression_series("./images/monarch.png")
     # make_compression_series("./images/night.jpg")
     # make_compression_series("./images/ocean.jpg")
+
+
+    train = ['astronaut.png', 'bananas.jpg']
+    test = ['flowers.jpg', 'night.jpg']
+    extra = ['ocean.jpg', 'jack.jpg']
+
+    imgs_train = [f'./images/{x}' for x in train]
+    imgs_test = [f'./images/{x}' for x in test]
+    imgs_extra = [f'./images/{x}' for x in extra]
+
+    make_psnr_scatterplot(imgs_train, imgs_test, imgs_extra)
 

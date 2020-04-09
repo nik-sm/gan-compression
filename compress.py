@@ -1,4 +1,5 @@
 """
+TODO - explain compressed format
 Compressed file format:
     Needs to have info about
     - z vector
@@ -32,7 +33,6 @@ import params as P
 
 LATENT_VECTOR_FILENAME = 'z.pt.gz'
 INFO_JSON_FILENAME = 'info.json'
-# DEFAULT_GEN_CLASS = SizedGenerator # TODO - switch to using SimpleGenerator
 DEFAULT_GEN_CLASS = SimpleGenerator
 DEFAULT_GEN_CKPT = './checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt'
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -72,9 +72,9 @@ def compress(img,
 
     if skip_linear_layer:
         latent_dim = get_latent_dim(compression_ratio)
+        linear_layer = get_linear_layer(latent_dim)
     else:
         latent_dim = g.latent_dim
-    linear_layer = get_linear_layer(latent_dim)
 
     z = torch.randn(latent_dim, device=DEVICE)
     z = torch.nn.Parameter(torch.clamp(z, -1, 1))
@@ -112,9 +112,10 @@ def compress(img,
     if output_filename is not None:
         if not output_filename.endswith('.ganz'):
             output_filename += '.ganz'
-        write_ganz(output_filename, z, p, gen_ckpt)
-
-    return x_hat, z, p
+        file_size = write_ganz(output_filename, z, p, gen_ckpt)
+        return x_hat, z, p, file_size
+    else:
+        return x_hat, z, p
 
 
 def get_latent_dim(compression_ratio):
@@ -135,7 +136,7 @@ def write_ganz(output_filename, z, psnr, gen_ckpt):
         'PSNR': psnr
     }
     _write_ganz(output_filename, z, info_json)
-    return
+    return get_size(output_filename)
 
 
 def _write_ganz(output_filename, z, info_json):
@@ -209,16 +210,30 @@ def sha1sum(gen_ckpt):
     return sha1.hexdigest()
 
 
-class TestGANZ(unittest.TestCase):
+def get_size(start_path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for d in dirnames:
+            total_size += get_size(os.path.join(dirpath, d))
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if not os.path.islink(fp): # skip links
+                total_size += os.path.getsize(fp)
+    return total_size
 
+
+class TestGANZ(unittest.TestCase):
     def test_all(self):
         img = './images/bananas.jpg'
 
         output_filename = './images/bananas.ganz'
         if os.path.exists(output_filename):
             shutil.rmtree(output_filename)
-        x_hat, z, psnr = compress(img, 10, output_filename)
-        #self.assertTrue(psnr > 25)
+        x_hat, z, psnr = compress(img, 
+                compression_ratio=10, 
+                output_filename=output_filename, 
+                n_steps=5000)
+        self.assertTrue(psnr > 25)
 
         result_filename = './images/degraded_bananas.jpg'
         if os.path.exists(result_filename):

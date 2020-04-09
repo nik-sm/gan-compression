@@ -30,6 +30,7 @@ def img2coeffs(Wim, levels=4):
     return coeffs
 
 
+# TODO - explore alternate wavelets. 'db2'? 'bior'?
 def dwt2(im):
     coeffs = pywt.wavedec2(im, wavelet='db4', mode='per', level=4)
     Wim, rest = coeffs[0], coeffs[1:]

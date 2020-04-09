@@ -10,3 +10,7 @@ checkpoints/
 data/*
 py37/*
 tags
+
+# Desired items in images/ and figures/ should be added manually
+images/ 
+figures/

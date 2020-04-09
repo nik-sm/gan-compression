@@ -7,6 +7,7 @@ from PIL import Image
 import numpy as np
 import math
 from tqdm import tqdm
+import pathlib
 
 from wavelet import wavelet_threshold
 from compress import get_latent_dim
@@ -90,50 +91,80 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     return
 
 
-def make_psnr_scatterplot(imgs_train, imgs_test, imgs_extra):
+def make_psnr_scatterplot():
     """
     For a list of images, compute the PSNR from GANZ and from Wavelets,
     and use these as the X,Y coords in a scatterplot
+
+    Settings:
+    - 7500 steps for each compression
+    - 20 images per group (train/test/extra)
+    - 4 generator checkpoints
+    - 2 target compression ratios
     """
-    fig, ax = plt.subplots(1, 1, figsize=(16,9), constrained_layout=True)
-    ax.set_title(f'PSNR')
+
+
+    
+    n_imgs = 2
+    imgs_train = sorted(pathlib.Path('./data/celeba_preprocessed-v2/train').rglob('*'))[:n_imgs]
+    imgs_test = sorted(pathlib.Path('./data/celeba_preprocessed-v2/test').rglob('*'))[:n_imgs]
+    imgs_extra = sorted(pathlib.Path('./images/out_of_domain/').rglob('*'))[:n_imgs]
+
+    imgs_train = [str(x) for x in imgs_train]
+    imgs_test = [str(x) for x in imgs_test]
+    imgs_extra = [str(x) for x in imgs_extra]
+
+    gen_ckpts = {'./checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('c', 64),
+                 './checkpoints/celeba_ELU_latent_dim_128/gen_ckpt.49.pt': ('y', 128),
+                 './checkpoints/celeba_ELU_latent_dim_256/gen_ckpt.49.pt': ('g', 256),
+                 './checkpoints/celeba_ELU_latent_dim_512/gen_ckpt.49.pt': ('r', 512)}
+
+    # TODO - Review chosen settings before launch
+    cratios = {5: 'x', 20: 'o'} 
+
+    _scatter(gen_ckpts, cratios, imgs_train, 'CelebA_Train')
+    _scatter(gen_ckpts, cratios, imgs_test, 'CelebA_Test')
+    _scatter(gen_ckpts, cratios, imgs_extra, 'Out-of-Domain')
+    return
+
+def _scatter(gen_ckpts, cratios, imgs, title):
+    compressive_sensing = False
+
+    fig, ax = plt.subplots(1, 1, figsize=(9,9), constrained_layout=True)
+    ax.set_title(f'PSNR on: {title}')
     ax.set_ylabel('GANZ')
     ax.set_xlabel('Wavelet')
 
-    _scatter(ax, imgs_train, 'CelebA_Train', 'r', '+')
-    _scatter(ax, imgs_test, 'CelebA_Test', 'g', 'd')
-    _scatter(ax, imgs_extra, 'ImageNet', 'b', 'o')
+    lims = [10,50] # TODO - Check that this is a safe lower bound, or set empirically
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
 
-    lims = [np.min([ax.get_xlim(), ax.get_ylim()]),
-            np.max([ax.get_xlim(), ax.get_ylim()])]
     ax.plot(lims, lims, 'k--', alpha=0.3, zorder=0)
 
+    for g, (color, latent_dim) in gen_ckpts.items():
+        for cratio, marker in cratios.items():
+            psnr_ganz = []
+            psnr_wave = []
+            for img in tqdm(imgs):
+                # Find PSNR from GANZ compression
+                torch_img = load_target_image(img)
+                _, _, p_gan = compress(torch_img,
+                        compression_ratio=cratio,
+                        skip_linear_layer=True, 
+                        compressive_sensing=compressive_sensing, 
+                        n_steps=2) # TODO - 
+                psnr_ganz.append(p_gan)
+
+                # Find PSNR from Wavelet compression
+                np_img = torch_img.numpy().transpose((1, 2, 0))
+                wavelet_img = wavelet_threshold(np_img, cratio)
+                p_wav = psnr(torch.from_numpy(np_img), torch.from_numpy(wavelet_img))
+                psnr_wave.append(p_wav)
+            ax.scatter(psnr_wave, psnr_ganz, c=color, marker=marker, alpha=0.5, 
+                    label=f'CR={cratio},training_dim={latent_dim}')
+
     fig.legend()
-    plt.savefig(f'./figures/psnr_scatterplot.png')
-    return
-
-
-def _scatter(ax, imgs, label, color, marker, compressive_sensing=False):
-    compression_ratio=20
-    psnr_ganz = []
-    psnr_wave = []
-    for img in tqdm(imgs):
-        # Find PSNR from GANZ compression
-        torch_img = load_target_image(img)
-        _, _, p_gan = compress(torch_img,
-                compression_ratio=compression_ratio,
-                skip_linear_layer=True, 
-                compressive_sensing=compressive_sensing, 
-                n_steps=5)
-        psnr_ganz.append(p_gan)
-
-        # Find PSNR from Wavelet compression
-        np_img = torch_img.numpy().transpose((1, 2, 0))
-        wavelet_img = wavelet_threshold(np_img, compression_ratio)
-        p_wav = psnr(torch.from_numpy(np_img), torch.from_numpy(wavelet_img))
-        psnr_wave.append(p_wav)
-
-    ax.scatter(psnr_wave, psnr_ganz, c=color, marker=marker, alpha=0.5, label=label)
+    plt.savefig(f'./figures/psnr_scatterplot.{title}.png')
     return
 
 
@@ -164,14 +195,5 @@ if __name__ == "__main__":
     # make_compression_series("./images/night.jpg")
     # make_compression_series("./images/ocean.jpg")
 
-
-    train = ['astronaut.png', 'bananas.jpg']
-    test = ['flowers.jpg', 'night.jpg']
-    extra = ['ocean.jpg', 'jack.jpg']
-
-    imgs_train = [f'./images/{x}' for x in train]
-    imgs_test = [f'./images/{x}' for x in test]
-    imgs_extra = [f'./images/{x}' for x in extra]
-
-    make_psnr_scatterplot(imgs_train, imgs_test, imgs_extra)
+    make_psnr_scatterplot()
 

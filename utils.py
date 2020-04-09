@@ -146,11 +146,11 @@ def save_gif(latent_dim,
     return
 
 
-def load_target_image(filename):
-    if filename.endswith('.pt'):
-        x = torch.load(filename)
+def load_target_image(img):
+    if img.endswith('.pt'):
+        x = torch.load(img)
     else:
-        image = Image.open(filename)
+        image = Image.open(img)
         height, width = image.size
 
         if height > width:

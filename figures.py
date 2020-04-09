@@ -31,13 +31,11 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     # This means we would be making these series for various gans,
     # and compress() needs to take an argument specifying which one
     # (so that we can tell out here what the gen.latent_dim is)
-    np_img = load_target_image(img_fp).numpy().transpose((1, 2, 0))
+    bn, _ = os.path.splitext(os.path.basename(img_fp))
 
-    transformed_img = Image.fromarray((np_img * 255).astype(np.uint8))
-    p, ext = os.path.splitext(img_fp)
-    bn = os.path.basename(p)
-    transformed_img_fp = f'{p}_transformed.png'
-    transformed_img.save(transformed_img_fp)
+    CS = True # compressive sensing?
+    torch_img = load_target_image(img_fp)
+    np_img = torch_img.numpy().transpose((1, 2, 0))
 
     fig, axes = plt.subplots(len(ratios)+1,
                              2,
@@ -56,7 +54,8 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     axes[0, 0].set_xticks([])
     axes[0, 0].set_yticks([])
 
-    x_hat, _, psnr_gan = compress(transformed_img_fp, skip_linear_layer=False, n_steps=5000)
+    x_hat, _, psnr_gan = compress(torch_img, skip_linear_layer=False, 
+            compressive_sensing=CS, n_steps=5)
     gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
     axes[0, 1].imshow(gan_img)
     axes[0, 1].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
@@ -69,7 +68,7 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     for i, c, in enumerate(ratios):
         i += 1 # offset by 1
         # GAN compression
-        x_hat, _, psnr_gan = compress(transformed_img_fp, c, n_steps=5000)
+        x_hat, _, psnr_gan = compress(torch_img, c, compressive_sensing=CS, n_steps=5)
         gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
         axes[i, 0].imshow(gan_img)
         axes[i, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
@@ -93,18 +92,36 @@ def make_psnr_scatterplot():
     """
     For a list of images, compute the PSNR from GANZ and from Wavelets,
     and use these as the X,Y coords in a scatterplot
+    """
+    fig = plt.figure()
+    images_train = [] # CelebA Train
+    images_test = [] # CelebA Test
+    images_extra = [] # ImageNet selected images
 
-    images = []
+    _make_scatter(fig, images_train, "Train")
+    _make_scatter(fig, images_test, "Test")
+    _make_scatter(fig, images_extra, "ImageNet")
+
+
+def _make_scatter(fig, images, title):
     p_ganz = []
     p_wave = []
     for image in images:
-        p_ganz.append(...)
-        p_wave.append(...)
 
-    plt.scatter(p_ganz, p_wave)
-    plt.set_title('PSNR
-    """
-    pass
+        x_hat, _, psnr_gan = compress(transformed_img_fp, 
+                skip_linear_layer=False, 
+                compressive_sensing=CS, n_steps=5000)
+
+        p_ganz.append([])
+        p_wave.append([])
+
+    fig.scatter(p_ganz, p_wave)
+    fig.set_title(f'PSNR on: {10}')
+    fig.set_ylabel('GANZ')
+    fig.set_xlabel('Wavelet')
+    fig.plot(np.arange(len(p_ganz)))
+
+
 
 
 

@@ -58,7 +58,13 @@ def compress(img,
     - optimize
     - return final z vector and the final reconstructed img
     """
-    x = load_target_image(img).to(DEVICE)
+    if isinstance(img, str):
+        img = load_target_image(img)
+    else:
+        if not isinstance(img, torch.Tensor):
+            raise ValueError("Must provide filename or preprocessed torch.Tensor!")
+
+    x = img.to(DEVICE)
     g = load_trained_generator(DEFAULT_GEN_CLASS,
                                gen_ckpt,
                                latent_dim=GEN_LATENT_DIM).to(DEVICE)

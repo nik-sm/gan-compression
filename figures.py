@@ -2,7 +2,6 @@ import os
 from utils import load_target_image, psnr, save_gif
 import torch
 from compress import compress
-import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import math
@@ -11,6 +10,11 @@ import pathlib
 
 from wavelet import wavelet_threshold
 from compress import get_latent_dim
+
+# Use non-interactive backend
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 
 def make_gifs():
@@ -33,9 +37,12 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     # This means we would be making these series for various gans,
     # and compress() needs to take an argument specifying which one
     # (so that we can tell out here what the gen.latent_dim is)
+
+    # TODO : compressed sensing with keep linear_layer, latent_dim=8192 try 3 different images for each?
+
     bn, _ = os.path.splitext(os.path.basename(img_fp))
 
-    CS = True  # compressive sensing?
+    CS = False  # compressive sensing?
     torch_img = load_target_image(img_fp)
     np_img = torch_img.numpy().transpose((1, 2, 0))
 
@@ -59,7 +66,7 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     x_hat, _, psnr_gan = compress(torch_img,
                                   skip_linear_layer=False,
                                   compressive_sensing=CS,
-                                  n_steps=5)
+                                  n_steps=7500)
     gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
     axes[0, 1].imshow(gan_img)
     axes[0, 1].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
@@ -75,7 +82,7 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
         x_hat, _, psnr_gan = compress(torch_img,
                                       c,
                                       compressive_sensing=CS,
-                                      n_steps=5)
+                                      n_steps=7500)
         gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
         axes[i, 0].imshow(gan_img)
         axes[i, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
@@ -129,7 +136,7 @@ def make_psnr_scatterplot():
     # TODO - Review chosen settings before launch
     cratios = {10: 'x', 30: 'o'}
 
-    _scatter(gen_ckpts, cratios, imgs_train, 'CelebA_Train')
+    # _scatter(gen_ckpts, cratios, imgs_train, 'CelebA_Train')
     _scatter(gen_ckpts, cratios, imgs_test, 'CelebA_Test')
     # _scatter(gen_ckpts, cratios, imgs_extra, 'Out-of-Domain')
     return
@@ -181,7 +188,7 @@ def _scatter(gen_ckpts, cratios, imgs, title):
                        label=f'CR={cratio},training_dim={latent_dim}')
 
     ax.legend(loc='upper_left')
-    plt.savefig(f'./figures/psnr_scatterplot.{title}.png')
+    fig.savefig(f'./figures/psnr_scatterplot.{title}.png')
     return
 
 
@@ -191,12 +198,10 @@ if __name__ == "__main__":
     # make_gifs()
 
     # Celeba Train
-    #make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
+    make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
 
     # Celeba Test
-    # make_compression_series("./dataset/celeba_preprocessed/test/193124.pt")
     # make_compression_series("./dataset/celeba_preprocessed/test/196479.pt")
-    # make_compression_series("./dataset/celeba_preprocessed/test/197511.pt")
 
     # # FFHQ Test
     # make_compression_series("./dataset/ffhq_preprocessed/test/17205.pt")
@@ -212,4 +217,4 @@ if __name__ == "__main__":
     # make_compression_series("./images/night.jpg")
     # make_compression_series("./images/ocean.jpg")
 
-    make_psnr_scatterplot()
+    # make_psnr_scatterplot()

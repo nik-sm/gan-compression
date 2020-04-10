@@ -198,10 +198,10 @@ if __name__ == "__main__":
     # make_gifs()
 
     # Celeba Train
-    make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
+    # make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
 
     # Celeba Test
-    # make_compression_series("./dataset/celeba_preprocessed/test/196479.pt")
+    make_compression_series("./dataset/celeba_preprocessed/test/196479.pt")
 
     # # FFHQ Test
     # make_compression_series("./dataset/ffhq_preprocessed/test/17205.pt")
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     # # Random
     # make_compression_series("./images/astronaut.png")
     # make_compression_series("./images/bananas.jpg")
-    # make_compression_series("./images/jack.jpg")
+    make_compression_series("./images/jack.jpg")
     # make_compression_series("./images/lena.png")
     # make_compression_series("./images/monarch.png")
     # make_compression_series("./images/night.jpg")

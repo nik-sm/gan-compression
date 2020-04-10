@@ -267,5 +267,5 @@ if __name__ == "__main__":
     side_by_side_8192("./images/jack.jpg")
     side_by_side_8192("./images/obama.jpg")
     side_by_side_8192("./images/ferns.jpg")
-    side_by_side_8192("./dataset/celeba_preprocessed/train/034782.pt")
-    side_by_side_8192("./dataset/celeba_preprocessed/test/196479.pt")
+    side_by_side_8192("./data/celeba_preprocessed/train/034782.pt")
+    side_by_side_8192("./data/celeba_preprocessed/test/196479.pt")

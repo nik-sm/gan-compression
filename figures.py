@@ -31,6 +31,51 @@ def make_gifs():
         save_gif(X, checkpoints, f'./figures/latent_dim_{X}.gif')
 
 
+def side_by_side_8192(img_fp):
+    bn, _ = os.path.splitext(os.path.basename(img_fp))
+    n_steps=7500
+
+    torch_img = load_target_image(img_fp)
+    np_img = torch_img.numpy().transpose((1, 2, 0))
+
+    fig, axes = plt.subplots(1, 2,
+                             figsize=(16,9),
+                             gridspec_kw={
+                                 'wspace': 0,
+                                 'hspace': 0.13
+                             },
+                             constrained_layout=True)
+
+    axes[0].set_title('Square_Linear_Layer', fontsize=18)
+    x_hat_1, _, psnr_gan_1 = compress(torch_img,
+                                      skip_linear_layer=True,
+                                      no_linear_layer=False,
+                                      compression_ratio=6,
+                                      compressive_sensing=False,
+                                      n_steps=n_steps)
+    gan_img_1 = x_hat_1.detach().cpu().numpy().transpose((1, 2, 0))
+    axes[0].imshow(gan_img_1)
+    axes[0].set_xlabel(f'PSNR={psnr_gan_1:.2f}dB', fontsize=14)
+    axes[0].set_xticks([])
+    axes[0].set_yticks([])
+
+    axes[1].set_title('No_Linear_Layer', fontsize=18)
+    x_hat_2, _, psnr_gan_2 = compress(torch_img,
+                                      skip_linear_layer=True,
+                                      no_linear_layer=True,
+                                      compression_ratio=6,
+                                      compressive_sensing=False,
+                                      n_steps=n_steps)
+    gan_img_2 = x_hat_2.detach().cpu().numpy().transpose((1, 2, 0))
+    axes[1].imshow(gan_img_2)
+    axes[1].set_xlabel(f'PSNR={psnr_gan_2:.2f}dB', fontsize=14)
+    axes[1].set_xticks([])
+    axes[1].set_yticks([])
+
+    fig.savefig(f"./figures/{bn}.square_linear_layer_comparison.png")
+    return
+
+
 def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     # TODO - we can add one more target ratio,
     # e.g. for GAN64 it would be 768, for GAN128 it would be 384, etc
@@ -201,7 +246,7 @@ if __name__ == "__main__":
     # make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
 
     # Celeba Test
-    make_compression_series("./dataset/celeba_preprocessed/test/196479.pt")
+    # make_compression_series("./dataset/celeba_preprocessed/test/196479.pt")
 
     # # FFHQ Test
     # make_compression_series("./dataset/ffhq_preprocessed/test/17205.pt")
@@ -211,10 +256,16 @@ if __name__ == "__main__":
     # # Random
     # make_compression_series("./images/astronaut.png")
     # make_compression_series("./images/bananas.jpg")
-    make_compression_series("./images/jack.jpg")
+    # make_compression_series("./images/jack.jpg")
     # make_compression_series("./images/lena.png")
     # make_compression_series("./images/monarch.png")
     # make_compression_series("./images/night.jpg")
     # make_compression_series("./images/ocean.jpg")
 
     # make_psnr_scatterplot()
+
+    side_by_side_8192("./images/jack.jpg")
+    side_by_side_8192("./images/obama.jpg")
+    side_by_side_8192("./images/ferns.jpg")
+    side_by_side_8192("./dataset/celeba_preprocessed/train/034782.pt")
+    side_by_side_8192("./dataset/celeba_preprocessed/test/196479.pt")

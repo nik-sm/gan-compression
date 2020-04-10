@@ -43,6 +43,7 @@ GEN_LATENT_DIM = 64  # TODO - in order to load, need to match whatever latent di
 def compress(img,
              compression_ratio=None,
              skip_linear_layer=True,
+             no_linear_layer=False,
              output_filename=None,
              compressive_sensing=False,
              n_steps=5000,
@@ -72,7 +73,11 @@ def compress(img,
                                latent_dim=latent_dim).to(DEVICE)
     g.eval()
 
-    if skip_linear_layer:
+    if skip_linear_layer and no_linear_layer:
+        latent_dim = get_latent_dim(compression_ratio)
+        assert latent_dim == 8192, "input shape mismatch for CNN"
+        linear_layer = lambda z: z
+    elif skip_linear_layer:
         latent_dim = get_latent_dim(compression_ratio)
         linear_layer = get_linear_layer(latent_dim)
     else:

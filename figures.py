@@ -114,14 +114,14 @@ def side_by_side_8192(img_fp):
 
     fig, axes = plt.subplots(1,
                              2,
-                             figsize=(16, 9),
+                             figsize=(16, 10),
                              gridspec_kw={
                                  'wspace': 0,
                                  'hspace': 0.13
                              },
                              constrained_layout=True)
 
-    axes[0].set_title('Square_Linear', fontsize=52)
+    axes[0].set_title('Square_Linear', fontsize=54)
     x_hat_1, _, psnr_gan_1 = compress(torch_img,
                                       skip_linear_layer=True,
                                       no_linear_layer=False,
@@ -134,7 +134,7 @@ def side_by_side_8192(img_fp):
     axes[0].set_xticks([])
     axes[0].set_yticks([])
 
-    axes[1].set_title('No_Linear', fontsize=52)
+    axes[1].set_title('No_Linear', fontsize=54)
     x_hat_2, _, psnr_gan_2 = compress(torch_img,
                                       skip_linear_layer=True,
                                       no_linear_layer=True,

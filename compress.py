@@ -48,7 +48,6 @@ def compress(img,
              compressive_sensing=False,
              n_measurements=4000,
              n_steps=5000,
-             n_measurements=5000,
              gen_ckpt=DEFAULT_GEN_CKPT,
              latent_dim=GEN_LATENT_DIM):
     """

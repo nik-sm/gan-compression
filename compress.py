@@ -87,7 +87,7 @@ def compress(img,
     z = torch.nn.Parameter(torch.clamp(z, -1, 1))
 
     # lr = 0.3/compression_ratio
-    lr = 0.01
+    lr = 0.05
     #  target_lr_fraction = 0.01  # end at X% of starting LR
     # gamma = 2**(math.log2(target_lr_fraction) / n_steps)
     optimizer = torch.optim.Adam([z], lr=lr, betas=(0.5, 0.999))
@@ -153,7 +153,7 @@ def _write_ganz(output_filename, z, info_json):
 
     with gzip.GzipFile(os.path.join(output_filename, LATENT_VECTOR_FILENAME),
                        'wb') as z_handle:
-        print(f'DURING WRITE: z.shape: {z.shape}')
+        # print(f'DURING WRITE: z.shape: {z.shape}')
         torch.save(z.detach(), z_handle)
 
     # Save info JSON
@@ -227,7 +227,7 @@ def get_size(start_path):
             fp = os.path.join(dirpath, f)
             if not os.path.islink(fp):  # skip links
                 total_size += os.path.getsize(fp)
-    return total_size
+    return total_size / 1024.
 
 
 class TestGANZ(unittest.TestCase):

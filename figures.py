@@ -1,19 +1,20 @@
 import os
 from utils import load_target_image, psnr, save_gif
 import torch
-from compress import compress
+from compress import compress, get_size
 from PIL import Image
 import numpy as np
 import math
 from tqdm import tqdm
 import pathlib
+import tempfile
 
 from wavelet import wavelet_threshold
 from compress import get_latent_dim
 
 # Use non-interactive backend
-import matplotlib
-matplotlib.use('Agg')
+# import matplotlib
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
@@ -33,13 +34,14 @@ def make_gifs():
 
 def side_by_side_8192(img_fp):
     bn, _ = os.path.splitext(os.path.basename(img_fp))
-    n_steps=7500
+    n_steps = 7500
 
     torch_img = load_target_image(img_fp)
     np_img = torch_img.numpy().transpose((1, 2, 0))
 
-    fig, axes = plt.subplots(1, 2,
-                             figsize=(16,9),
+    fig, axes = plt.subplots(1,
+                             2,
+                             figsize=(16, 9),
                              gridspec_kw={
                                  'wspace': 0,
                                  'hspace': 0.13
@@ -101,40 +103,50 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
                              constrained_layout=True)
 
     # Show original image and keep_linear version
-    axes[0, 0].set_title('Original', fontsize=18)
-    axes[0, 1].set_title('Keep_Linear', fontsize=18)
+    axes[0, 0].set_title('Original', fontsize=24)
+    axes[0, 1].set_title('Keep_Linear', fontsize=24)
 
     axes[0, 0].imshow(np_img)
+    # TODO change to file size of transformed image
+    axes[0, 0].set_xlabel(f'Size={os.path.getsize(img_fp):.2f}kB')
     axes[0, 0].set_xticks([])
     axes[0, 0].set_yticks([])
 
-    x_hat, _, psnr_gan = compress(torch_img,
-                                  skip_linear_layer=False,
-                                  compressive_sensing=CS,
-                                  n_steps=7500)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        x_hat, _, psnr_gan, fs = compress(torch_img,
+                                          skip_linear_layer=False,
+                                          compressive_sensing=CS,
+                                          n_steps=7,
+                                          output_filename=tmpdir + "/")
     gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
     axes[0, 1].imshow(gan_img)
-    axes[0, 1].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
+    axes[0, 1].set_xlabel(f'PSNR={psnr_gan:.2f}dB\nSize={fs:.2f}kB',
+                          fontsize=14)
     axes[0, 1].set_xticks([])
     axes[0, 1].set_yticks([])
 
     # Show varying compression ratios
-    axes[1, 0].set_title('GAN', fontsize=18)
-    axes[1, 1].set_title('Wavelet', fontsize=18)
+    axes[1, 0].set_title('GAN', fontsize=24)
+    axes[1, 1].set_title('Wavelet', fontsize=24)
+
     for i, c, in enumerate(ratios):
         i += 1  # offset by 1
         # GAN compression
-        x_hat, _, psnr_gan = compress(torch_img,
-                                      c,
-                                      compressive_sensing=CS,
-                                      n_steps=7500)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            x_hat, _, psnr_gan, fs = compress(torch_img,
+                                              c,
+                                              compressive_sensing=CS,
+                                              n_steps=7,
+                                              output_filename=tmpdir + "/")
+            print('here')
         gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
         axes[i, 0].imshow(gan_img)
-        axes[i, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
+        axes[i, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB\nSize={fs:.2f}kB',
+                              fontsize=14)
         axes[i, 0].set_xticks([])
         axes[i, 0].set_yticks([])
 
-        axes[i, 0].set_ylabel(f'Ratio={c}', fontsize=16)
+        axes[i, 0].set_ylabel(f'Ratio={c}', fontsize=14)
 
         # Wavelet compression
         wavelet_img = wavelet_threshold(np_img, c)
@@ -172,33 +184,56 @@ def make_psnr_scatterplot():
     imgs_extra = [str(x) for x in imgs_extra]
 
     gen_ckpts = {
-        './checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('c', 64),
+        './checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('r', 64),
         './checkpoints/celeba_ELU_latent_dim_128/gen_ckpt.49.pt': ('y', 128),
         './checkpoints/celeba_ELU_latent_dim_256/gen_ckpt.49.pt': ('g', 256),
-        './checkpoints/celeba_ELU_latent_dim_512/gen_ckpt.49.pt': ('r', 512)
+        './checkpoints/celeba_ELU_latent_dim_512/gen_ckpt.49.pt': ('b', 512)
     }
 
-    # TODO - Review chosen settings before launch
     cratios = {10: 'x', 30: 'o'}
 
-    # _scatter(gen_ckpts, cratios, imgs_train, 'CelebA_Train')
-    _scatter(gen_ckpts, cratios, imgs_test, 'CelebA_Test')
-    # _scatter(gen_ckpts, cratios, imgs_extra, 'Out-of-Domain')
+    # Training_dim
+    _scatter(gen_ckpts, {10: 'x'}, imgs_train, 'Train', CR=False)
+    _scatter(gen_ckpts, {10: 'x'}, imgs_test, 'Test', CR=False)
+    _scatter(gen_ckpts, {10: 'x'}, imgs_extra, 'Out-of-Domain', CR=False)
+
+    # Compression Ratios
+    _scatter(
+        {'./checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('r', 64)},
+        cratios,
+        imgs_train,
+        'Train',
+        CR=True)
+    _scatter_dim(
+        {'./checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('r', 64)},
+        cratios,
+        imgs_test,
+        'Test',
+        CR=True)
+    _scatter_dim(
+        {'./checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('r', 64)},
+        cratios,
+        imgs_extra,
+        'Out-of-Domain',
+        CR=True)
+
     return
 
 
-def _scatter(gen_ckpts, cratios, imgs, title):
+def _scatter(gen_ckpts, cratios, imgs, title, CR=False):
     compressive_sensing = False
 
     fig, ax = plt.subplots(1, 1, figsize=(9, 9), constrained_layout=True)
-    ax.set_title(f'PSNR on: {title}')
-    ax.set_ylabel('GANZ')
-    ax.set_xlabel('Wavelet')
+    ax.set_title(f'PSNR on {title}', fontsize=28)
+    ax.set_ylabel('GANZ', fontsize=28)
+    ax.set_xlabel('Wavelet', fontsize=28)
 
-    lims = [0, 50
+    lims = [10, 50
            ]  # TODO - Check that this is a safe lower bound, or set empirically
     ax.set_xlim(lims)
     ax.set_ylim(lims)
+
+    ax.tick_params(axis='both', which='major', labelsize=20)
 
     ax.plot(lims, lims, 'k--', alpha=0.3)
     # ax.plot(ax.get_xlim(), ax.get_ylim(), 'k--', alpha=0.3)
@@ -216,7 +251,7 @@ def _scatter(gen_ckpts, cratios, imgs, title):
                                        compressive_sensing=compressive_sensing,
                                        n_steps=7500,
                                        gen_ckpt=g,
-                                       latent_dim=latent_dim)  # TODO -
+                                       latent_dim=latent_dim)
                 psnr_ganz.append(p_gan)
 
                 # Find PSNR from Wavelet compression
@@ -225,14 +260,19 @@ def _scatter(gen_ckpts, cratios, imgs, title):
                 p_wav = psnr(torch.from_numpy(np_img),
                              torch.from_numpy(wavelet_img))
                 psnr_wave.append(p_wav)
+            if CR:
+                label = f'CR={cratio}'
+            else:
+                label = f'Training_dim={latent_dim}'
             ax.scatter(psnr_wave,
                        psnr_ganz,
                        c=color,
                        marker=marker,
+                       s=(len(imgs) * len(gen_ckpts) * len(cratios)) * 1.5,
                        alpha=0.5,
-                       label=f'CR={cratio},training_dim={latent_dim}')
+                       label=label)
 
-    ax.legend(loc='upper_left')
+    ax.legend(loc='upper_left', fontsize=20)
     fig.savefig(f'./figures/psnr_scatterplot.{title}.png')
     return
 
@@ -243,7 +283,7 @@ if __name__ == "__main__":
     # make_gifs()
 
     # Celeba Train
-    # make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
+    make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
 
     # Celeba Test
     # make_compression_series("./dataset/celeba_preprocessed/test/196479.pt")
@@ -261,11 +301,12 @@ if __name__ == "__main__":
     # make_compression_series("./images/monarch.png")
     # make_compression_series("./images/night.jpg")
     # make_compression_series("./images/ocean.jpg")
+    # make_compression_series("./images/horsehead_nebula.jpg")
 
     # make_psnr_scatterplot()
 
-    side_by_side_8192("./images/jack.jpg")
-    side_by_side_8192("./images/obama.jpg")
-    side_by_side_8192("./images/ferns.jpg")
-    side_by_side_8192("./data/celeba_preprocessed/train/034782.pt")
-    side_by_side_8192("./data/celeba_preprocessed/test/196479.pt")
+    # side_by_side_8192("./images/jack.jpg")
+    # side_by_side_8192("./images/obama.jpg")
+    # side_by_side_8192("./images/ferns.jpg")
+    # side_by_side_8192("./data/celeba_preprocessed/train/034782.pt")
+    # side_by_side_8192("./data/celeba_preprocessed/test/196479.pt")

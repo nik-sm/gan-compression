@@ -193,28 +193,31 @@ def make_psnr_scatterplot():
     cratios = {10: 'x', 30: 'o'}
 
     # Training_dim
-    _scatter(gen_ckpts, {10: 'x'}, imgs_train, 'Train', CR=False)
-    _scatter(gen_ckpts, {10: 'x'}, imgs_test, 'Test', CR=False)
-    _scatter(gen_ckpts, {10: 'x'}, imgs_extra, 'Out-of-Domain', CR=False)
+    # _scatter(gen_ckpts, {10: 'x'}, imgs_train, 'Train (training_dim)', CR=False)
+    # _scatter(gen_ckpts, {10: 'x'}, imgs_test, 'Test (training_dim)', CR=False)
+    # _scatter(gen_ckpts, {10: 'x'},
+    #          imgs_extra,
+    #          'Out-of-Domain (training_dim)',
+    #          CR=False)
 
     # Compression Ratios
     _scatter(
         {'./checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('r', 64)},
         cratios,
         imgs_train,
-        'Train',
+        'Train (compression ratio)',
         CR=True)
-    _scatter_dim(
+    _scatter(
         {'./checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('r', 64)},
         cratios,
         imgs_test,
-        'Test',
+        'Test (compression ratio)',
         CR=True)
-    _scatter_dim(
+    _scatter(
         {'./checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt': ('r', 64)},
         cratios,
         imgs_extra,
-        'Out-of-Domain',
+        'Out-of-Domain (compression ratio)',
         CR=True)
 
     return
@@ -283,7 +286,7 @@ if __name__ == "__main__":
     # make_gifs()
 
     # Celeba Train
-    make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
+    # make_compression_series("./dataset/celeba_preprocessed/train/034782.pt")
 
     # Celeba Test
     # make_compression_series("./dataset/celeba_preprocessed/test/196479.pt")
@@ -303,7 +306,7 @@ if __name__ == "__main__":
     # make_compression_series("./images/ocean.jpg")
     # make_compression_series("./images/horsehead_nebula.jpg")
 
-    # make_psnr_scatterplot()
+    make_psnr_scatterplot()
 
     # side_by_side_8192("./images/jack.jpg")
     # side_by_side_8192("./images/obama.jpg")

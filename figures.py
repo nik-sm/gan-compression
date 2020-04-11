@@ -54,12 +54,12 @@ def single_image(img_fp,
                              },
                              constrained_layout=True)
 
-    axes[0].set_title('Original', fontsize=18)
+    axes[0].set_title('Original', fontsize=52)
     axes[0].imshow(np_img)
     axes[0].set_xticks([])
     axes[0].set_yticks([])
 
-    axes[1].set_title(f'GANZ, CR={cratio}, CS={CS}', fontsize=18)
+    axes[1].set_title(f'GANZ, CR={cratio}, CS={CS}', fontsize=52)
     x_hat, _, psnr_gan = compress(torch_img,
                                   skip_linear_layer=True,
                                   no_linear_layer=no_linear_layer,
@@ -69,7 +69,7 @@ def single_image(img_fp,
                                   n_steps=n_steps)
     gan_img_2 = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
     axes[1].imshow(gan_img_2)
-    axes[1].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
+    axes[1].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=48)
     axes[1].set_xticks([])
     axes[1].set_yticks([])
 
@@ -84,7 +84,9 @@ def single_image(img_fp,
     return psnr_gan
 
 
+# Unfinished code
 def compressive_sensing_psnr(split='test', measure_fraction=0.1):
+    pass
     imgs_test = sorted(
         pathlib.Path('./data/celeba_preprocessed/test').rglob('*'))[:n_imgs]
     imgs_test = [str(x) for x in imgs_test]
@@ -389,20 +391,18 @@ if __name__ == "__main__":
     # side_by_side_8192("./images/jack.jpg")
     # side_by_side_8192("./images/ferns.jpg")
 
-    single_image("./images/jack.jpg", cratio=6, n_steps=7500, CS=False)
-    #single_image("./images/jack.jpg", cratio=1, n_steps=7500, CS=False)
-    #single_image("./images/jack.jpg", cratio=6, n_steps=7500, CS=True, n_measure=5000)
-    #single_image("./images/jack.jpg", cratio=1, n_steps=7500, CS=True, n_measure=5000)
-    #single_image("./images/jack.jpg", cratio=6, n_steps=7500, CS=True, n_measure=500)
-    #single_image("./images/jack.jpg", cratio=1, n_steps=7500, CS=True, n_measure=500)
-    # single_image("./data/celeba_preprocessed/train/034782.pt",
-    #              cratio=6,
-    #              n_steps=7500,
-    #              CS=True,
-    #              n_measure=5000)
-
-    # single_image("./data/celeba_preprocessed/test/196479.pt",
-    #              cratio=6,
-    #              n_steps=7500,
-    #              CS=True,
-    #              n_measure=5000)
+    single_image("./dataset/celeba_preprocessed/train/034782.pt",
+                 cratio=6,
+                 n_steps=7500,
+                 CS=True,
+                 n_measure=4000)
+    single_image("./dataset/celeba_preprocessed/test/196479.pt",
+                 cratio=6,
+                 n_steps=7500,
+                 CS=True,
+                 n_measure=4000)
+    single_image("./images/jack.jpg",
+                 cratio=6,
+                 n_steps=7500,
+                 CS=True,
+                 n_measure=5000)

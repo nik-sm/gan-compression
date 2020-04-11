@@ -46,6 +46,7 @@ def compress(img,
              no_linear_layer=False,
              output_filename=None,
              compressive_sensing=False,
+             n_measurements=4000,
              n_steps=5000,
              gen_ckpt=DEFAULT_GEN_CKPT,
              latent_dim=GEN_LATENT_DIM):
@@ -95,7 +96,6 @@ def compress(img,
     # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
 
     if compressive_sensing:
-        n_measurements = 5000
         A = torch.randn(n_measurements, np.prod(x.shape),
                         device=DEVICE) / math.sqrt(n_measurements)
 

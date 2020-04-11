@@ -121,7 +121,7 @@ def side_by_side_8192(img_fp):
                              },
                              constrained_layout=True)
 
-    axes[0].set_title('Square_Linear_Layer', fontsize=52)
+    axes[0].set_title('Square_Linear', fontsize=52)
     x_hat_1, _, psnr_gan_1 = compress(torch_img,
                                       skip_linear_layer=True,
                                       no_linear_layer=False,
@@ -134,7 +134,7 @@ def side_by_side_8192(img_fp):
     axes[0].set_xticks([])
     axes[0].set_yticks([])
 
-    axes[1].set_title('No_Linear_Layer', fontsize=52)
+    axes[1].set_title('No_Linear', fontsize=52)
     x_hat_2, _, psnr_gan_2 = compress(torch_img,
                                       skip_linear_layer=True,
                                       no_linear_layer=True,
@@ -385,24 +385,28 @@ if __name__ == "__main__":
 
     # make_psnr_scatterplot()
 
-    # side_by_side_8192("./images/obama.jpg")
-    # side_by_side_8192("./dataset/celeba_preprocessed/train/034782.pt")
-    # side_by_side_8192("./dataset/celeba_preprocessed/test/196479.pt")
-    # side_by_side_8192("./images/jack.jpg")
-    # side_by_side_8192("./images/ferns.jpg")
+    side_by_side_8192("./dataset/celeba_preprocessed/train/034782.pt")
+    side_by_side_8192("./dataset/celeba_preprocessed/test/196479.pt")
+    side_by_side_8192("./images/jack.jpg")
+    side_by_side_8192("./images/ferns.jpg")
+    side_by_side_8192("./images/horsehead_nebula.jpg")
+    side_by_side_8192("./images/subway.jpg")
+    side_by_side_8192("./images/campfire.jpg")
+    side_by_side_8192("./images/ocean.jpg")
+    side_by_side_8192("./images/snow_tree.jpg")
 
-    single_image("./dataset/celeba_preprocessed/train/034782.pt",
-                 cratio=6,
-                 n_steps=7500,
-                 CS=True,
-                 n_measure=4000)
-    single_image("./dataset/celeba_preprocessed/test/196479.pt",
-                 cratio=6,
-                 n_steps=7500,
-                 CS=True,
-                 n_measure=4000)
-    single_image("./images/jack.jpg",
-                 cratio=6,
-                 n_steps=7500,
-                 CS=True,
-                 n_measure=5000)
+    # single_image("./dataset/celeba_preprocessed/train/034782.pt",
+    #              cratio=6,
+    #              n_steps=7500,
+    #              CS=True,
+    #              n_measure=4000)
+    # single_image("./dataset/celeba_preprocessed/test/196479.pt",
+    #              cratio=6,
+    #              n_steps=7500,
+    #              CS=True,
+    #              n_measure=4000)
+    # single_image("./images/jack.jpg",
+    #              cratio=6,
+    #              n_steps=7500,
+    #              CS=True,
+    #              n_measure=5000)

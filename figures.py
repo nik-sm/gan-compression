@@ -1,7 +1,7 @@
 import os
 from utils import load_target_image, psnr, save_gif
 import torch
-from compress import compress, get_size
+from compress import compress, get_size, read_ganz
 from PIL import Image
 import numpy as np
 import math
@@ -32,6 +32,77 @@ def make_gifs():
         save_gif(X, checkpoints, f'./figures/latent_dim_{X}.gif')
 
 
+def single_image(img_fp,
+                 cratio=6,
+                 no_linear_layer=False,
+                 n_steps=7500,
+                 n_measure=5000,
+                 CS=False):
+    if no_linear_layer and cratio != 6:
+        raise ValueError('bad combination')
+
+    bn, _ = os.path.splitext(os.path.basename(img_fp))
+    torch_img = load_target_image(img_fp)
+    np_img = torch_img.numpy().transpose((1, 2, 0))
+
+    fig, axes = plt.subplots(1,
+                             2,
+                             figsize=(16, 9),
+                             gridspec_kw={
+                                 'wspace': 0,
+                                 'hspace': 0.13
+                             },
+                             constrained_layout=True)
+
+    axes[0].set_title('Original', fontsize=18)
+    axes[0].imshow(np_img)
+    axes[0].set_xticks([])
+    axes[0].set_yticks([])
+
+    axes[1].set_title(f'GANZ, CR={cratio}, CS={CS}', fontsize=18)
+    x_hat, _, psnr_gan = compress(torch_img,
+                                  skip_linear_layer=True,
+                                  no_linear_layer=no_linear_layer,
+                                  compression_ratio=cratio,
+                                  compressive_sensing=CS,
+                                  n_measurements=n_measure,
+                                  n_steps=n_steps)
+    gan_img_2 = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
+    axes[1].imshow(gan_img_2)
+    axes[1].set_xlabel(f'PSNR={psnr_gan:.2f}dB', fontsize=14)
+    axes[1].set_xticks([])
+    axes[1].set_yticks([])
+
+    if CS:
+        name = "./figures/{}.comp.CR={}.CS={}.n_steps={}.n_measure={}.png".format(
+            bn, cratio, CS, n_steps, n_measure)
+    else:
+        name = "./figures/{}.comp.CR={}.CS={}.n_steps={}.png".format(
+            bn, cratio, CS, n_steps)
+
+    fig.savefig(name)
+    return psnr_gan
+
+
+def compressive_sensing_psnr(split='test', measure_fraction=0.1):
+    imgs_test = sorted(
+        pathlib.Path('./data/celeba_preprocessed/test').rglob('*'))[:n_imgs]
+    imgs_test = [str(x) for x in imgs_test]
+
+    n_measurements = int(measure_fraction * (128 * 128 * 3))
+
+    comp_sens_psnr = []
+    for image in imgs_test:
+        torch_img = load_target_image(img_fp)
+        _, _, psnr_gan = compress(torch_img,
+                                  skip_linear_layer=True,
+                                  no_linear_layer=False,
+                                  compression_ratio=6,
+                                  compressive_sensing=True,
+                                  n_measurements=n_measurements,
+                                  n_steps=n_steps)
+
+
 def side_by_side_8192(img_fp):
     bn, _ = os.path.splitext(os.path.basename(img_fp))
     n_steps = 7500
@@ -48,7 +119,7 @@ def side_by_side_8192(img_fp):
                              },
                              constrained_layout=True)
 
-    axes[0].set_title('Square_Linear_Layer', fontsize=18)
+    axes[0].set_title('Square_Linear_Layer', fontsize=52)
     x_hat_1, _, psnr_gan_1 = compress(torch_img,
                                       skip_linear_layer=True,
                                       no_linear_layer=False,
@@ -57,11 +128,11 @@ def side_by_side_8192(img_fp):
                                       n_steps=n_steps)
     gan_img_1 = x_hat_1.detach().cpu().numpy().transpose((1, 2, 0))
     axes[0].imshow(gan_img_1)
-    axes[0].set_xlabel(f'PSNR={psnr_gan_1:.2f}dB', fontsize=14)
+    axes[0].set_xlabel(f'PSNR={psnr_gan_1:.2f}dB', fontsize=48)
     axes[0].set_xticks([])
     axes[0].set_yticks([])
 
-    axes[1].set_title('No_Linear_Layer', fontsize=18)
+    axes[1].set_title('No_Linear_Layer', fontsize=52)
     x_hat_2, _, psnr_gan_2 = compress(torch_img,
                                       skip_linear_layer=True,
                                       no_linear_layer=True,
@@ -70,7 +141,7 @@ def side_by_side_8192(img_fp):
                                       n_steps=n_steps)
     gan_img_2 = x_hat_2.detach().cpu().numpy().transpose((1, 2, 0))
     axes[1].imshow(gan_img_2)
-    axes[1].set_xlabel(f'PSNR={psnr_gan_2:.2f}dB', fontsize=14)
+    axes[1].set_xlabel(f'PSNR={psnr_gan_2:.2f}dB', fontsize=48)
     axes[1].set_xticks([])
     axes[1].set_yticks([])
 
@@ -87,6 +158,7 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
 
     # TODO : compressed sensing with keep linear_layer, latent_dim=8192 try 3 different images for each?
 
+    # Change to png first
     bn, _ = os.path.splitext(os.path.basename(img_fp))
 
     CS = False  # compressive sensing?
@@ -95,7 +167,7 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
 
     fig, axes = plt.subplots(len(ratios) + 1,
                              2,
-                             figsize=(5, 17),
+                             figsize=(5, 18),
                              gridspec_kw={
                                  'wspace': 0,
                                  'hspace': 0.13
@@ -106,22 +178,25 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     axes[0, 0].set_title('Original', fontsize=24)
     axes[0, 1].set_title('Keep_Linear', fontsize=24)
 
-    axes[0, 0].imshow(np_img)
     # TODO change to file size of transformed image
-    axes[0, 0].set_xlabel(f'Size={os.path.getsize(img_fp):.2f}kB')
-    axes[0, 0].set_xticks([])
-    axes[0, 0].set_yticks([])
-
     with tempfile.TemporaryDirectory() as tmpdir:
+        axes[0, 0].imshow(np_img)
+        transformed_img_fp = os.path.join(tmpdir, 'transformed_img.npz')
+        np.savez_compressed(transformed_img_fp, np_img)
+        axes[0, 0].set_xlabel(f'Size={get_size(transformed_img_fp):.2f}kB',
+                              fontsize=18)
+        axes[0, 0].set_xticks([])
+        axes[0, 0].set_yticks([])
+
         x_hat, _, psnr_gan, fs = compress(torch_img,
                                           skip_linear_layer=False,
                                           compressive_sensing=CS,
-                                          n_steps=7,
+                                          n_steps=7500,
                                           output_filename=tmpdir + "/")
     gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
     axes[0, 1].imshow(gan_img)
     axes[0, 1].set_xlabel(f'PSNR={psnr_gan:.2f}dB\nSize={fs:.2f}kB',
-                          fontsize=14)
+                          fontsize=18)
     axes[0, 1].set_xticks([])
     axes[0, 1].set_yticks([])
 
@@ -130,31 +205,31 @@ def make_compression_series(img_fp, ratios=[10, 20, 50, 100, 768]):
     axes[1, 1].set_title('Wavelet', fontsize=24)
 
     for i, c, in enumerate(ratios):
-        i += 1  # offset by 1
-        # GAN compression
         with tempfile.TemporaryDirectory() as tmpdir:
-            x_hat, _, psnr_gan, fs = compress(torch_img,
-                                              c,
-                                              compressive_sensing=CS,
-                                              n_steps=7,
-                                              output_filename=tmpdir + "/")
-            print('here')
-        gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
-        axes[i, 0].imshow(gan_img)
-        axes[i, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB\nSize={fs:.2f}kB',
-                              fontsize=14)
-        axes[i, 0].set_xticks([])
-        axes[i, 0].set_yticks([])
+            i += 1  # offset by 1
+            # GAN compression
+            x_hat, _, psnr_gan, fs_gan = compress(torch_img,
+                                                  c,
+                                                  compressive_sensing=CS,
+                                                  n_steps=7500,
+                                                  output_filename=tmpdir + "/")
+            gan_img = x_hat.detach().cpu().numpy().transpose((1, 2, 0))
+            axes[i, 0].imshow(gan_img)
+            axes[i, 0].set_xlabel(f'PSNR={psnr_gan:.2f}dB\nSize={fs_gan:.2f}kB',
+                                  fontsize=18)
+            axes[i, 0].set_xticks([])
+            axes[i, 0].set_yticks([])
 
-        axes[i, 0].set_ylabel(f'Ratio={c}', fontsize=14)
+            axes[i, 0].set_ylabel(f'Ratio={c}', fontsize=24)
 
-        # Wavelet compression
-        wavelet_img = wavelet_threshold(np_img, c)
-        axes[i, 1].imshow(wavelet_img)
-        psnr_wav = psnr(torch.from_numpy(np_img), torch.from_numpy(wavelet_img))
-        axes[i, 1].set_xlabel(f'PSNR={psnr_wav:.2f}dB', fontsize=14)
-        axes[i, 1].set_xticks([])
-        axes[i, 1].set_yticks([])
+            # Wavelet compression
+            wavelet_img, _ = wavelet_threshold(np_img, c)
+            axes[i, 1].imshow(wavelet_img)
+            psnr_wav = psnr(torch.from_numpy(np_img),
+                            torch.from_numpy(wavelet_img))
+            axes[i, 1].set_xlabel(f'PSNR={psnr_wav:.2f}dB', fontsize=18)
+            axes[i, 1].set_xticks([])
+            axes[i, 1].set_yticks([])
 
     fig.savefig(f"./figures/{bn}.compression_series.png")
     return
@@ -193,12 +268,12 @@ def make_psnr_scatterplot():
     cratios = {10: 'x', 30: 'o'}
 
     # Training_dim
-    # _scatter(gen_ckpts, {10: 'x'}, imgs_train, 'Train (training_dim)', CR=False)
-    # _scatter(gen_ckpts, {10: 'x'}, imgs_test, 'Test (training_dim)', CR=False)
-    # _scatter(gen_ckpts, {10: 'x'},
-    #          imgs_extra,
-    #          'Out-of-Domain (training_dim)',
-    #          CR=False)
+    _scatter(gen_ckpts, {10: 'x'}, imgs_train, 'Train (training_dim)', CR=False)
+    _scatter(gen_ckpts, {10: 'x'}, imgs_test, 'Test (training_dim)', CR=False)
+    _scatter(gen_ckpts, {10: 'x'},
+             imgs_extra,
+             'Out-of-Domain (training_dim)',
+             CR=False)
 
     # Compression Ratios
     _scatter(
@@ -306,10 +381,28 @@ if __name__ == "__main__":
     # make_compression_series("./images/ocean.jpg")
     # make_compression_series("./images/horsehead_nebula.jpg")
 
-    make_psnr_scatterplot()
+    # make_psnr_scatterplot()
 
-    # side_by_side_8192("./images/jack.jpg")
     # side_by_side_8192("./images/obama.jpg")
+    # side_by_side_8192("./dataset/celeba_preprocessed/train/034782.pt")
+    # side_by_side_8192("./dataset/celeba_preprocessed/test/196479.pt")
+    # side_by_side_8192("./images/jack.jpg")
     # side_by_side_8192("./images/ferns.jpg")
-    # side_by_side_8192("./data/celeba_preprocessed/train/034782.pt")
-    # side_by_side_8192("./data/celeba_preprocessed/test/196479.pt")
+
+    single_image("./images/jack.jpg", cratio=6, n_steps=7500, CS=False)
+    #single_image("./images/jack.jpg", cratio=1, n_steps=7500, CS=False)
+    #single_image("./images/jack.jpg", cratio=6, n_steps=7500, CS=True, n_measure=5000)
+    #single_image("./images/jack.jpg", cratio=1, n_steps=7500, CS=True, n_measure=5000)
+    #single_image("./images/jack.jpg", cratio=6, n_steps=7500, CS=True, n_measure=500)
+    #single_image("./images/jack.jpg", cratio=1, n_steps=7500, CS=True, n_measure=500)
+    # single_image("./data/celeba_preprocessed/train/034782.pt",
+    #              cratio=6,
+    #              n_steps=7500,
+    #              CS=True,
+    #              n_measure=5000)
+
+    # single_image("./data/celeba_preprocessed/test/196479.pt",
+    #              cratio=6,
+    #              n_steps=7500,
+    #              CS=True,
+    #              n_measure=5000)

@@ -31,7 +31,7 @@ from utils import load_target_image, load_trained_generator, psnr
 import unittest
 import params as P
 
-LATENT_VECTOR_FILENAME = 'z.pt.gz'
+LATENT_VECTOR_FILENAME = 'z.npz'
 INFO_JSON_FILENAME = 'info.json'
 DEFAULT_GEN_CLASS = SimpleGenerator
 DEFAULT_GEN_CKPT = './checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt'
@@ -151,10 +151,8 @@ def _write_ganz(output_filename, z, info_json):
     os.makedirs(output_filename)
     # Save latent vector
 
-    with gzip.GzipFile(os.path.join(output_filename, LATENT_VECTOR_FILENAME),
-                       'wb') as z_handle:
-        # print(f'DURING WRITE: z.shape: {z.shape}')
-        torch.save(z.detach(), z_handle)
+    np.savez_compressed(os.path.join(output_filename, LATENT_VECTOR_FILENAME),
+                        z.detach().cpu().numpy())
 
     # Save info JSON
     with open(os.path.join(output_filename, INFO_JSON_FILENAME),
@@ -173,6 +171,7 @@ def uncompress(inp, output_filename=None, gen_ckpt=DEFAULT_GEN_CKPT):
     else:
         z = inp
 
+    z = z.to(DEVICE)
     latent_dim = z.shape[0]
     print(f'during uncompress, latent_dim {latent_dim}')
     linear_layer = get_linear_layer(latent_dim)
@@ -192,10 +191,8 @@ def uncompress(inp, output_filename=None, gen_ckpt=DEFAULT_GEN_CKPT):
 
 def read_ganz(input_filename):
     # Read latent vector
-    with gzip.GzipFile(os.path.join(input_filename, LATENT_VECTOR_FILENAME),
-                       'rb') as f:
-        z = torch.load(f)
-        print(f'DURING WRITE: z.shape: {z.shape}')
+    z = np.load(os.path.join(input_filename, LATENT_VECTOR_FILENAME))
+    z = torch.from_numpy(z['arr_0'])
 
     # Read info JSON
     with open(os.path.join(input_filename, INFO_JSON_FILENAME), 'r') as f:
@@ -219,15 +216,18 @@ def sha1sum(gen_ckpt):
 
 
 def get_size(start_path):
-    total_size = 0
-    for dirpath, dirnames, filenames in os.walk(start_path):
-        for d in dirnames:
-            total_size += get_size(os.path.join(dirpath, d))
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            if not os.path.islink(fp):  # skip links
-                total_size += os.path.getsize(fp)
-    return total_size / 1024.
+    if os.path.isfile(start_path):
+        return os.path.getsize(start_path) / 1024.
+    else:
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(start_path):
+            for d in dirnames:
+                total_size += get_size(os.path.join(dirpath, d))
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                if not os.path.islink(fp):  # skip links
+                    total_size += os.path.getsize(fp)
+        return total_size / 1024.
 
 
 class TestGANZ(unittest.TestCase):
@@ -238,10 +238,10 @@ class TestGANZ(unittest.TestCase):
         output_filename = './images/bananas.ganz'
         if os.path.exists(output_filename):
             shutil.rmtree(output_filename)
-        x_hat, z, psnr = compress(img,
-                                  compression_ratio=10,
-                                  output_filename=output_filename,
-                                  n_steps=5000)
+        x_hat, z, psnr, fs = compress(img,
+                                      compression_ratio=10,
+                                      output_filename=output_filename,
+                                      n_steps=5000)
         self.assertTrue(psnr > 25)
 
         result_filename = './images/degraded_bananas.jpg'

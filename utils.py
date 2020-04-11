@@ -152,6 +152,9 @@ def load_target_image(img):
 
 def psnr(img1, img2):
     mse = F.mse_loss(img1, img2)
+    return _psnr(mse)
+
+def _psnr(mse):
     if mse == 0:
         raise ValueError("how do we handle a perfect reconstruction?")
     pixel_max = torch.tensor(1.0)
@@ -159,3 +162,7 @@ def psnr(img1, img2):
     if isinstance(p, torch.Tensor):
         p = p.item()
     return p
+
+
+if __name__ == '__main__':
+    print(_psnr(torch.tensor(0.0005)))

@@ -74,11 +74,11 @@ def single_image(img_fp,
     axes[1].set_yticks([])
 
     if CS:
-        name = "./figures/{}.comp.CR={}.CS={}.n_steps={}.n_measure={}.png".format(
-            bn, cratio, CS, n_steps, n_measure)
+        name = "./figures/{}.comp.CR={}.no_linear_layer={}.CS={}.n_steps={}.n_measure={}.png".format(
+            bn, cratio, no_linear_layer, CS, n_steps, n_measure)
     else:
-        name = "./figures/{}.comp.CR={}.CS={}.n_steps={}.png".format(
-            bn, cratio, CS, n_steps)
+        name = "./figures/{}.comp.CR={}.no_linear_layer={}.CS={}.n_steps={}.png".format(
+            bn, cratio, no_linear_layer, CS, n_steps)
 
     fig.savefig(name)
     return psnr_gan
@@ -385,28 +385,29 @@ if __name__ == "__main__":
 
     # make_psnr_scatterplot()
 
-    side_by_side_8192("./dataset/celeba_preprocessed/train/034782.pt")
-    side_by_side_8192("./dataset/celeba_preprocessed/test/196479.pt")
-    side_by_side_8192("./images/jack.jpg")
-    side_by_side_8192("./images/ferns.jpg")
-    side_by_side_8192("./images/horsehead_nebula.jpg")
-    side_by_side_8192("./images/subway.jpg")
-    side_by_side_8192("./images/campfire.jpg")
-    side_by_side_8192("./images/ocean.jpg")
-    side_by_side_8192("./images/snow_tree.jpg")
+    # side_by_side_8192("./images/obama.jpg")
+    # side_by_side_8192("./dataset/celeba_preprocessed/train/034782.pt")
+    # side_by_side_8192("./dataset/celeba_preprocessed/test/196479.pt")
+    # side_by_side_8192("./images/jack.jpg")
+    # side_by_side_8192("./images/ferns.jpg")
 
-    # single_image("./dataset/celeba_preprocessed/train/034782.pt",
-    #              cratio=6,
-    #              n_steps=7500,
-    #              CS=True,
-    #              n_measure=4000)
-    # single_image("./dataset/celeba_preprocessed/test/196479.pt",
-    #              cratio=6,
-    #              n_steps=7500,
-    #              CS=True,
-    #              n_measure=4000)
-    # single_image("./images/jack.jpg",
-    #              cratio=6,
-    #              n_steps=7500,
-    #              CS=True,
-    #              n_measure=5000)
+#    for im in tqdm(["./data/celeba_preprocessed/train/034782.pt",
+#                    "./data/celeba_preprocessed/test/196479.pt",
+#                    "./images/jack.jpg"]):
+#        for n_measure in tqdm([4000, 10000], leave=False):
+#            single_image(im,
+#                         cratio=6,
+#                         no_linear_layer=True,
+#                         n_steps=7500,
+#                         CS=True,
+#                         n_measure=n_measure)
+
+    for im in tqdm(["./images/bananas.jpg"]):
+        for n_measure in tqdm([4000], leave=False):
+            single_image(im,
+                         cratio=6,
+                         no_linear_layer=False,
+                         n_steps=7500,
+                         CS=True,
+                         n_measure=n_measure)
+

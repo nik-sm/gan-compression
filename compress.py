@@ -1,17 +1,20 @@
 """
-TODO - explain compressed format
-Compressed file format:
-    Needs to have info about
-    - z vector
-    - info about generator (which generator to use for uncompress())
+Images are represented by a latent vector and metadata about the generator.
 
+The latent vector is found by stochastic gradient descent with a fixed, trained
+generator.
+
+For an image saved as "img.ganz", we will have:
     img.ganz/
-        z.pt.gz
-        info.json
+    ├── z.npz
+    └── info.json
 
-    info.json = { "gen_ckpt_name" : "...",
-                  "checksum" : "...",
-                  "PSNR" : ... }
+...where `info.json` contains:
+        'gen_ckpt_name' : filename of generator model
+        'sha1sum'       : SHA1 hash of generator model
+        'PSNR'          : PSNR value of reconstructed image
+
+...and `z.npz` is the latent vector needed to reconstruct the image.
 """
 import math
 import shutil
@@ -36,9 +39,7 @@ INFO_JSON_FILENAME = 'info.json'
 DEFAULT_GEN_CLASS = SimpleGenerator
 DEFAULT_GEN_CKPT = './checkpoints/celeba_ELU_latent_dim_64/gen_ckpt.49.pt'
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-GEN_LATENT_DIM = 64  # TODO - in order to load, need to match whatever latent dim the gen has. Should figure this out from gen_ckpt filename or something, maybe store in info_json
-# Compression
-
+GEN_LATENT_DIM = 64  
 
 def compress(img,
              compression_ratio=None,
@@ -56,10 +57,6 @@ def compress(img,
         compression_ratio - (dimension of input) / (dimension of output)
         output_filename - optional, will save the z vector and the generator checkpoint checksum + name
 
-    - figure out whether to skip_linear_layer
-    - make a starting z vector
-    - optimize
-    - return final z vector and the final reconstructed img
     """
     if isinstance(img, str):
         img = load_target_image(img)

@@ -165,4 +165,4 @@ def _psnr(mse):
 
 
 if __name__ == '__main__':
-    print(_psnr(torch.tensor(0.0005)))
+    print(_psnr(torch.tensor(0.025)))

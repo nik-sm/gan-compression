@@ -5,7 +5,7 @@ We perform lossy image compression and compressive sensing using a BEGAN model t
 We show how to smoothly vary the latent dimension of the model without retraining.
 Some of our compressive sensing results are [bananas!](#compressive-sensing-on-bananas)
 
-For more details, see our [writeup](writeup.pdf).
+For more details, see our [writeup](gans-for-lossy-image-compression.pdf).
 
 # Usage
 

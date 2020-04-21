@@ -5,6 +5,7 @@ from torch_model import SizedGenerator, SizedDiscriminator
 from model import SimpleDiscriminator, SimpleGenerator
 from tqdm import tqdm, trange
 import os
+import sys
 
 import params as P
 from dataloaders import get_dataloader, AVAIL_DATALOADERS
@@ -40,7 +41,7 @@ def main(dataset, dataset_path, run_name, n_train, output_activ, epochs, latent_
     # TODO - useful print? print(f"FolderDataset: {dataloader.dataset}")
 
 #    gen = SizedGenerator(latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
-    gen = SimpleGenerator(latent_dim, act=output_activ).to(device)
+    gen = SimpleGenerator(latent_dim, P.size, act=output_activ).to(device)
 #    disc = SizedDiscriminator(latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
     disc = SimpleDiscriminator(latent_dim, P.num_filters, P.size, P.num_ups, output_activ).to(device)
     print(disc)
